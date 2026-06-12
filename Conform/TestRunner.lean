@@ -118,10 +118,8 @@ def executeTransaction
   (header : BlockHeader)
   : Except Evm.Exception ExecutionState
 := do
-  let _fuel : ℕ := s.accountMap.find? sender |>.elim 0 (·.balance) |>.toNat
-
   let (ypState, substate, statusCode, totalGasUsed) ←
-    Υ _fuel
+    Υ
       s.accountMap
       header.baseFeePerGas
       header
@@ -534,32 +532,31 @@ def processBlocks
         | none => pure s₀
         | some roots =>
           let beaconRootsAddressCode := roots.code
-          let _fuel := 2^14
           -- the call does not count against the block’s gas limit
           let beaconCallResult :=
-            Θ _fuel
-              []
-              .empty
-              s₀.genesisBlockHeader
-              s₀.blocks
-              s₀.accountMap
-              s₀.accountMap
-              default
-              SYSTEM_ADDRESS
-              SYSTEM_ADDRESS
-              BEACON_ROOTS_ADDRESS
-              (.Code beaconRootsAddressCode)
-              30000000
-              0xe8d4a51000
-              0
-              0
-              block.blockHeader.parentBeaconBlockRoot
-              0
-              block.blockHeader
-              true
+            messageCall
+              { blobVersionedHashes := []
+                createdAccounts := .empty
+                genesisBlockHeader := s₀.genesisBlockHeader
+                blocks := s₀.blocks
+                accounts := s₀.accountMap
+                originalAccounts := s₀.accountMap
+                substate := default
+                caller := SYSTEM_ADDRESS
+                origin := SYSTEM_ADDRESS
+                recipient := BEACON_ROOTS_ADDRESS
+                codeSource := .Code beaconRootsAddressCode
+                gas := 30000000
+                gasPrice := 0xe8d4a51000
+                value := 0
+                apparentValue := 0
+                calldata := block.blockHeader.parentBeaconBlockRoot
+                depth := 0
+                blockHeader := block.blockHeader
+                canModifyState := true }
           let σ ←
             match beaconCallResult with
-              | .ok (_, σ, _, _, _ /- can't fail-/, _) => pure σ
+              | .ok r /- can't fail -/ => pure r.accounts
               | .error e => throw <| .ExecutionException e
           let s := {s₀ with accountMap := σ}
           pure s
