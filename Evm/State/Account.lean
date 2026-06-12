@@ -20,7 +20,7 @@ inductive ToExecute where
   | Precompiled (precompiled : AccountAddress)
 
 structure PersistentAccountState where
-  nonce    : UInt256
+  nonce    : UInt64
   balance  : UInt256
   storage  : Storage
   code     : ByteArray

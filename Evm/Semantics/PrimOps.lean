@@ -40,10 +40,23 @@ Charge the memory-expansion component of H.1 — `Cₘ(μᵢ′) − Cₘ(μᵢ)
 `μᵢ′ = M(μᵢ, offset, size)`. Only the cost is charged here; `activeWords`
 itself is updated by the instruction's own semantics.
 -/
-@[inline] def chargeMemExpansion (exec : ExecutionState) (offset size : ℕ) :
+@[inline] def memoryExpansionWords? (activeWords : UInt64) (offset size : UInt256) : Option UInt64 := do
+  if size == 0 then
+    some activeWords
+  else
+    let offset ← offset.toUInt64?
+    let size ← size.toUInt64?
+    let maxUInt64 := (0xffffffffffffffff : UInt64)
+    if offset > maxUInt64 - size || offset + size > maxUInt64 - 31 then
+      none
+    else
+      some (MachineState.M activeWords offset size)
+
+@[inline] def chargeMemExpansion (exec : ExecutionState) (offset size : UInt256) :
     Except ExecutionException ExecutionState :=
-  let words' : UInt256 := .ofNat <| MachineState.M exec.activeWords.toNat offset size
-  charge (Cₘ words' - Cₘ exec.activeWords) exec
+  match memoryExpansionWords? exec.activeWords offset size with
+    | none => .error .OutOfGas
+    | some words' => charge (Cₘ words' - Cₘ exec.activeWords) exec
 
 /-- `StaticModeViolation` unless the frame may modify state (the YP's `W` set, eq. 159). -/
 @[inline] def requireStateMod (exec : ExecutionState) : Except ExecutionException Unit :=
@@ -103,7 +116,7 @@ def swap (n : ℕ) (exec : ExecutionState) : Step := do
 def logArm (exec : ExecutionState) (stack : Stack UInt256) (offset size : UInt256)
     (topics : Array UInt256) : Step := do
   requireStateMod exec
-  let exec ← chargeMemExpansion exec offset.toNat size.toNat
+  let exec ← chargeMemExpansion exec offset size
   let exec ← charge (logCost topics.size size) exec
   let exec' := exec.logOp offset size topics
   continueWith <| exec'.replaceStackAndIncrPC stack

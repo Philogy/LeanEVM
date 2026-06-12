@@ -33,15 +33,16 @@ structure Frame where
   validJumps : Array UInt32
   exec       : ExecutionState
 
-def Frame.get_dest (f : Frame) (dest : UInt256) : Option UInt32 :=
-  f.validJumps.find? (fun actual => UInt256.ofUInt32 actual = dest)
+def Frame.get_dest (f : Frame) (dest : UInt256) : Option UInt32 := do
+  let d ← dest.toUInt32?
+  f.validJumps.find? (fun actual => actual == d)
 
 /-- How a frame finished executing. -/
 inductive FrameHalt where
   /-- Normal halt (STOP/RETURN/SELFDESTRUCT): final state and output data. -/
   | success (exec : ExecutionState) (output : ByteArray)
   /-- REVERT: remaining gas and revert data; state rolls back to the checkpoint. -/
-  | revert (gasRemaining : UInt256) (output : ByteArray)
+  | revert (gasRemaining : UInt64) (output : ByteArray)
   /-- Exceptional halt: all gas is consumed, state rolls back to the checkpoint. -/
   | exception (e : ExecutionException)
 
@@ -62,10 +63,10 @@ structure PendingCall where
   stack          : Stack UInt256
   callerAccounts : AccountMap
   value          : UInt256
-  inOffset       : UInt256
-  inSize         : UInt256
-  outOffset      : UInt256
-  outSize        : UInt256
+  inOffset       : UInt64
+  inSize         : UInt64
+  outOffset      : UInt64
+  outSize        : UInt64
 
 /--
 A parent frame suspended on CREATE/CREATE2. `initCodeSize` feeds the
@@ -76,8 +77,8 @@ structure PendingCreate where
   stack          : Stack UInt256
   callerAccounts : AccountMap
   value          : UInt256
-  initOffset     : UInt256
-  initSize       : UInt256
+  initOffset     : UInt64
+  initSize       : UInt64
   initCodeSize   : ℕ
 
 /-- A suspended parent frame awaiting a child frame's result. -/

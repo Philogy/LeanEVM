@@ -26,6 +26,7 @@ open Lean (FromJson Json)
   }
 
 instance : FromJson UInt256 := fromBlobString UInt256.fromBlob?
+instance : FromJson UInt64 := fromBlobString UInt64.fromBlob?
 instance : FromJson ℕ := fromBlobString Nat.fromBlob?
 
 instance : FromJson AccountAddress := fromBlobString AccountAddress.fromBlob?
@@ -39,7 +40,7 @@ instance : FromJson (PersistentAccountState) where
   fromJson? json := do
     pure {
       balance := ← json.getObjValAs? UInt256 "balance"
-      nonce   := ← json.getObjValAs? UInt256 "nonce"
+      nonce   := ← json.getObjValAs? UInt64 "nonce"
       code    := ← json.getObjValAs? Code    "code"
       storage := ← json.getObjValAs? Storage "storage"
     }
@@ -96,8 +97,8 @@ instance : FromJson Withdrawal where
 instance : FromJson Transaction where
   fromJson? json := do
     let baseTransaction : Transaction.Base := {
-      nonce          := ← json.getObjValAsD! UInt256 "nonce"
-      gasLimit       := ← json.getObjValAsD! UInt256 "gasLimit"
+      nonce          := ← json.getObjValAsD! UInt64 "nonce"
+      gasLimit       := ← json.getObjValAsD! UInt64 "gasLimit"
       recipient      := ← match json.getObjVal? "to" with
                           | .error _ => .ok .none
                           | .ok ok => do let str ← ok.getStr?

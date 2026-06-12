@@ -45,7 +45,7 @@ def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
 
     | .KECCAK256 => do
       let (stack, offset, size) ← exec.stack.pop2
-      let exec ← chargeMemExpansion exec offset.toNat size.toNat
+      let exec ← chargeMemExpansion exec offset size
       let exec ← charge (keccakCost size) exec
       let (v, machine') := exec.toMachineState.keccak256 offset size
       continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toMachineState := machine' } (stack.push v)
@@ -65,26 +65,26 @@ def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
 
     | .CALLDATACOPY => do
       let (stack, mstart, dstart, size) ← exec.stack.pop3
-      let exec ← chargeMemExpansion exec mstart.toNat size.toNat
+      let exec ← chargeMemExpansion exec mstart size
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         (exec.calldatacopy mstart dstart size) stack
     | .CODECOPY => do
       let (stack, mstart, cstart, size) ← exec.stack.pop3
-      let exec ← chargeMemExpansion exec mstart.toNat size.toNat
+      let exec ← chargeMemExpansion exec mstart size
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         (exec.codeCopy mstart cstart size) stack
     | .EXTCODECOPY => do
       let (stack, addr, mstart, cstart, size) ← exec.stack.pop4
-      let exec ← chargeMemExpansion exec mstart.toNat size.toNat
+      let exec ← chargeMemExpansion exec mstart size
       let exec ← charge (accessCost (AccountAddress.ofUInt256 addr) exec.substate + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         (exec.extCodeCopy' addr mstart cstart size) stack
     | .RETURNDATACOPY => do
       let (stack, mstart, rstart, size) ← exec.stack.pop3
       if rstart.toNat + size.toNat > exec.returnData.size then throw .InvalidMemoryAccess
-      let exec ← chargeMemExpansion exec mstart.toNat size.toNat
+      let exec ← chargeMemExpansion exec mstart size
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         { exec with toMachineState := exec.toMachineState.returndatacopy mstart rstart size } stack

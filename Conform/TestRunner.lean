@@ -294,11 +294,11 @@ def validateTransaction
       | .legacy t | .access t =>
         if t.gasLimit.toNat * t.gasPrice.toNat > 2^256 then
           throw <| .TransactionException .GASLIMIT_PRICE_PRODUCT_OVERFLOW
-        pure <| t.gasLimit * t.gasPrice + t.value
-      | .dynamic t => pure <|  t.gasLimit * t.maxFeePerGas + t.value
+        pure <| UInt256.ofUInt64 t.gasLimit * t.gasPrice + t.value
+      | .dynamic t => pure <|  UInt256.ofUInt64 t.gasLimit * t.maxFeePerGas + t.value
       | .blob t =>
         pure <|
-          t.gasLimit * t.maxFeePerGas
+          UInt256.ofUInt64 t.gasLimit * t.maxFeePerGas
           + t.value
           + (UInt256.ofNat (getTotalBlobGas T)) * t.maxFeePerBlobGas
   if v₀ > senderBalance then

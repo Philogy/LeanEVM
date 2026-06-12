@@ -21,7 +21,7 @@ open GasConstants
 /--
 The memory cost function `Cₘ` (328).
 -/
-def Cₘ (a : UInt256) : ℕ :=
+def Cₘ (a : UInt64) : ℕ :=
   let a : ℕ := a.toNat
   Gmemory * a + ((a * a) / QuadraticCeofficient)
   where QuadraticCeofficient : ℕ := 512
@@ -90,20 +90,20 @@ def callExtraCost (t r : AccountAddress) (val : UInt256) (accounts : AccountMap)
   accessCost t substate + transferCost val + newAccountCost r val accounts
 
 /-- `CCALLGAS`'s cap: `gasAvailable` is the gas after the memory-expansion charge. -/
-def callGasCap (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt256) (substate : Substate) :=
+def callGasCap (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt64) (substate : Substate) :=
   if gasAvailable.toNat >= callExtraCost t r val accounts substate then
     min (allButOneSixtyFourth <| (gasAvailable.toNat - callExtraCost t r val accounts substate)) g.toNat
   else
     g.toNat
 
 /-- `CCALLGAS`: the child's gas allowance. -/
-def callGas (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt256) (substate : Substate) : ℕ :=
+def callGas (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt64) (substate : Substate) : ℕ :=
   match val with
     | 0 => callGasCap t r val g accounts gasAvailable substate
     | _ => callGasCap t r val g accounts gasAvailable substate + GasConstants.Gcallstipend
 
 /-- `CCALL`: what the caller is charged. -/
-def callCost (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt256) (substate : Substate) : ℕ :=
+def callCost (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (gasAvailable : UInt64) (substate : Substate) : ℕ :=
   callGasCap t r val g accounts gasAvailable substate + callExtraCost t r val accounts substate
 
 /--

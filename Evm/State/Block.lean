@@ -177,8 +177,8 @@ def deserializeBlock
 
             let base : Transaction.Base :=
               .mk
-                (.ofNat <| fromByteArrayBigEndian nonce)
-                (.ofNat <| fromByteArrayBigEndian gasLimit)
+                (← validateUInt64 nonce (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
+                (← validateUInt64 gasLimit (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
                 recipient
                 (← validateUInt256 value (.TransactionException .RLP_INVALID_VALUE))
                 r
@@ -226,8 +226,8 @@ def deserializeBlock
 
             let base : Transaction.Base :=
               .mk
-                (.ofNat <| fromByteArrayBigEndian nonce)
-                (.ofNat <| fromByteArrayBigEndian gasLimit)
+                (← validateUInt64 nonce (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
+                (← validateUInt64 gasLimit (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
                 recipient
                 (← validateUInt256 value (.TransactionException .RLP_INVALID_VALUE))
                 r
@@ -269,8 +269,8 @@ def deserializeBlock
 
             let base : Transaction.Base :=
               .mk
-                (.ofNat <| fromByteArrayBigEndian nonce)
-                (.ofNat <| fromByteArrayBigEndian gasLimit)
+                (← validateUInt64 nonce (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
+                (← validateUInt64 gasLimit (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
                 recipient
                 (← validateUInt256 value (.TransactionException .RLP_INVALID_VALUE))
                 r
@@ -303,8 +303,8 @@ def deserializeBlock
 
         let base : Transaction.Base :=
           Transaction.Base.mk
-            (.ofNat <| fromByteArrayBigEndian nonce)
-            (.ofNat <| fromByteArrayBigEndian gasLimit)
+            (← validateUInt64 nonce (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
+            (← validateUInt64 gasLimit (.BlockException .RLP_INVALID_FIELD_OVERFLOW_64))
             recipient
             (← validateUInt256 value (.TransactionException .RLP_INVALID_VALUE))
             r

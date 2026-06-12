@@ -30,27 +30,27 @@ def calldatacopy (self : ExecutionState) (mstart datastart size : UInt256) : Exe
   { self with
     memory := self.executionEnv.calldata.write datastart.toNat self.memory mstart.toNat size.toNat
     activeWords :=
-      .ofNat (MachineState.M self.activeWords.toNat mstart.toNat size.toNat)
+      MachineState.M self.activeWords mstart.toUInt64 size.toUInt64
   }
 
 def codeCopy (self : ExecutionState) (mstart cstart size : UInt256) : ExecutionState :=
   { self with
     memory := self.executionEnv.code.write cstart.toNat self.memory mstart.toNat size.toNat
     activeWords :=
-      .ofNat (MachineState.M self.activeWords.toNat mstart.toNat size.toNat)
+      MachineState.M self.activeWords mstart.toUInt64 size.toUInt64
   }
 
 def extCodeCopy' (self : ExecutionState) (acc mstart cstart size : UInt256) : ExecutionState :=
-  let mstart := mstart.toNat
+  let mstartNat := mstart.toNat
   let cstart := cstart.toNat
-  let size := size.toNat
+  let sizeNat := size.toNat
   let addr := AccountAddress.ofUInt256 acc
   let b : ByteArray := self.lookupAccount addr |>.option .empty (·.code)
   { self with
-    memory := b.write cstart self.memory mstart size
+    memory := b.write cstart self.memory mstartNat sizeNat
     substate := .addAccessedAccount self.substate addr
     activeWords :=
-      .ofNat (MachineState.M self.activeWords.toNat mstart size)
+      MachineState.M self.activeWords mstart.toUInt64 size.toUInt64
   }
 
 end Memory
@@ -60,7 +60,7 @@ def logOp (offset size : UInt256) (topics : Array UInt256) (self : ExecutionStat
   let mem := self.memory.readWithPadding offset.toNat size.toNat
   { self with
     substate.logSeries := self.substate.logSeries.push ⟨address, topics, mem⟩
-    activeWords := .ofNat (MachineState.M self.activeWords.toNat offset.toNat size.toNat)
+    activeWords := MachineState.M self.activeWords offset.toUInt64 size.toUInt64
   }
 
 def liftMState {m} [Monad m] (f : Evm.State → m (Evm.State)) : ExecutionState → m ExecutionState :=

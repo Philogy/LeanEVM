@@ -14,19 +14,19 @@ def smsfOp (op : SmsfOp) (fr : Frame) (exec : ExecutionState) : Step :=
       continueWith <| exec.replaceStackAndIncrPC stack
     | .MLOAD => do
       let (stack, addr) ← exec.stack.pop
-      let exec ← chargeMemExpansion exec addr.toNat 32
+      let exec ← chargeMemExpansion exec addr 32
       let exec ← charge Gverylow exec
       let (v, machine') := exec.toMachineState.mload addr
       continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toMachineState := machine' } (stack.push v)
     | .MSTORE => do
       let (stack, addr, val) ← exec.stack.pop2
-      let exec ← chargeMemExpansion exec addr.toNat 32
+      let exec ← chargeMemExpansion exec addr 32
       let exec ← charge Gverylow exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         { exec with toMachineState := exec.toMachineState.mstore addr val } stack
     | .MSTORE8 => do
       let (stack, addr, val) ← exec.stack.pop2
-      let exec ← chargeMemExpansion exec addr.toNat 1
+      let exec ← chargeMemExpansion exec addr 1
       let exec ← charge Gverylow exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         { exec with toMachineState := exec.toMachineState.mstore8 addr val } stack
@@ -52,7 +52,7 @@ def smsfOp (op : SmsfOp) (fr : Frame) (exec : ExecutionState) : Step :=
       continueWith <| ExecutionState.replaceStackAndIncrPC
         { exec with toState := exec.toState.tstore key val } stack
     | .MSIZE => pushOp (λ s ↦ s.toMachineState.msize) exec
-    | .GAS => pushOp (λ s ↦ s.gasAvailable) exec
+    | .GAS => pushOp (λ s ↦ UInt256.ofUInt64 s.gasAvailable) exec
     | .JUMP => do
       let exec ← charge Gmid exec
       let (stack, dest) ← exec.stack.pop
@@ -74,7 +74,7 @@ def smsfOp (op : SmsfOp) (fr : Frame) (exec : ExecutionState) : Step :=
       continueWith exec.incrPC
     | .MCOPY => do
       let (stack, dest, src, size) ← exec.stack.pop3
-      let exec ← chargeMemExpansion exec (max dest.toNat src.toNat) size.toNat
+      let exec ← chargeMemExpansion exec (max dest src) size
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
         { exec with toMachineState := exec.toMachineState.mcopy dest src size } stack

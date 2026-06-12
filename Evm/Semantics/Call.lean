@@ -134,9 +134,9 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
   let evmState := pd.frame.exec
   let output := result.output
   -- outputWriteLen ≡ min({μs[6], ‖output‖})
-  let outputWriteLen : UInt256 := min pd.outSize (.ofNat output.size)
+  let outputWriteLen : ℕ := min pd.outSize.toNat output.size
   -- μ′_m[μs[5] ... (μs[5] + outputWriteLen − 1)] = output[0 ... (outputWriteLen − 1)]
-  let machineWithOutput := writeBytes output 0 evmState.toMachineState pd.outOffset.toNat outputWriteLen.toNat
+  let machineWithOutput := writeBytes output 0 evmState.toMachineState pd.outOffset.toNat outputWriteLen
   let gasAfterReturn := machineWithOutput.gasAvailable + result.gasRemaining -- Ccall was subtracted as part of C
 
   let codeExecutionFailed   : Bool := !result.success
@@ -152,8 +152,8 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
         returnData   := output -- μ′output = output
         gasAvailable := gasAfterReturn
         activeWords :=
-          let m : ℕ := MachineState.M evmState.toMachineState.activeWords.toNat pd.inOffset.toNat pd.inSize.toNat
-          .ofNat <| MachineState.M m pd.outOffset.toNat pd.outSize.toNat }
+          let m := MachineState.M evmState.toMachineState.activeWords pd.inOffset pd.inSize
+          MachineState.M m pd.outOffset pd.outSize }
 
   let exec' : ExecutionState :=
     { evmState with

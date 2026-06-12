@@ -24,8 +24,8 @@ open Batteries (RBMap RBSet)
 - `data`      `d/i`
 -/
 structure Transaction.Base where
-  nonce           : UInt256
-  gasLimit        : UInt256
+  nonce           : UInt64
+  gasLimit        : UInt64
   recipient       : Option AccountAddress
   value           : UInt256
   r               : ByteArray

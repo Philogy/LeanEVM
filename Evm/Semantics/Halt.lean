@@ -9,11 +9,11 @@ open Operation
 
 def returnOrRevertOp (op : SystemOp) (exec : ExecutionState) : Step := do
   let (stack, offset, size) ← exec.stack.pop2
-  let exec ← chargeMemExpansion exec offset.toNat size.toNat
+  let exec ← chargeMemExpansion exec offset size
   let output := exec.memory.readWithPadding offset.toNat size.toNat
   let machine :=
     { exec.toMachineState with
-        activeWords := .ofNat <| MachineState.M exec.activeWords.toNat offset.toNat size.toNat }
+        activeWords := MachineState.M exec.activeWords offset.toUInt64 size.toUInt64 }
   let exec := ExecutionState.replaceStackAndIncrPC { exec with toMachineState := machine } stack
   if op = .REVERT then
     return .halted (.revert exec.gasAvailable output)

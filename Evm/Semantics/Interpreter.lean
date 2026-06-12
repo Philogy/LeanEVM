@@ -83,7 +83,7 @@ The driver's step budget for a top-level execution with gas limit `gas` —
 generous (see `drive`): instructions cost ≥ 1 gas each and descents ≥ 100, so
 `2 * gas` already overshoots; the constant covers the zero-gas edge cases.
 -/
-def seedFuel (gas : UInt256) : ℕ := 2 * gas.toNat + 4096
+def seedFuel (gas : UInt64) : ℕ := 2 * gas.toNat + 4096
 
 /--
 Message call — the YP's `Θ` (eq. 119): execute `params.codeSource` in the

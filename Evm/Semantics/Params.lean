@@ -27,7 +27,7 @@ structure CallParams where
   origin              : AccountAddress
   recipient           : AccountAddress
   codeSource          : ToExecute
-  gas                 : UInt256
+  gas                 : UInt64
   gasPrice            : UInt256
   value               : UInt256
   apparentValue       : UInt256
@@ -44,7 +44,7 @@ Result of a message call — the YP's `Θ` return tuple
 structure CallResult where
   createdAccounts : Batteries.RBSet AccountAddress compare
   accounts        : AccountMap
-  gasRemaining    : UInt256
+  gasRemaining    : UInt64
   substate        : Substate
   success         : Bool
   output          : ByteArray
@@ -66,7 +66,7 @@ structure CreateParams where
   substate            : Substate
   caller              : AccountAddress
   origin              : AccountAddress
-  gas                 : UInt256
+  gas                 : UInt64
   gasPrice            : UInt256
   value               : UInt256
   initCode            : ByteArray
@@ -92,6 +92,6 @@ structure TransactionResult where
   accounts : AccountMap
   substate : Substate
   success  : Bool
-  gasUsed  : UInt256
+  gasUsed  : UInt64
 
 end Evm

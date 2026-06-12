@@ -33,8 +33,9 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
   -- EIP-3860 (includes EIP-170)
   -- https://eips.ethereum.org/EIPS/eip-3860
 
-  let creatorNonce : UInt256 := (accounts.find? creator |>.option 0 (·.nonce)) - 1
-  let some addressPreimage := contractAddressBytes creator creatorNonce params.salt params.initCode | .error .StackUnderflow
+  let creatorNonce : UInt64 := (accounts.find? creator |>.option 0 (·.nonce)) - 1
+  let creatorNonceWord : UInt256 := UInt256.ofUInt64 creatorNonce
+  let some addressPreimage := contractAddressBytes creator creatorNonceWord params.salt params.initCode | .error .StackUnderflow
   let newAddress : AccountAddress := -- (94) (95)
     (ffi.KEC addressPreimage).extract 12 32 /- 160 bits = 20 bytes -/
       |> fromByteArrayBigEndian |> Fin.ofNat _
@@ -176,7 +177,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
         accounts := result.accounts
         substate := result.substate
         createdAccounts := result.createdAccounts
-        activeWords := .ofNat <| MachineState.M evmState.activeWords.toNat pd.initOffset.toNat pd.initSize.toNat
+        activeWords := MachineState.M evmState.activeWords pd.initOffset pd.initSize
         returnData := newReturnData
         gasAvailable := .ofNat <| gas.toNat - allButOneSixtyFourth gas.toNat + gasRemaining.toNat }
   return { pd.frame with exec := exec'.replaceStackAndIncrPC (pd.stack.push pushedValue) }

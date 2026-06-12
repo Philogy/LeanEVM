@@ -24,8 +24,8 @@ The partial shared `MachineState` `μ`. Section 9.4.1.
 delivers it directly in its `Signal`.)
 -/
 structure MachineState where
-  gasAvailable        : UInt256
-  activeWords         : UInt256
+  gasAvailable        : UInt64
+  activeWords         : UInt64
   memory              : ByteArray
   returnData          : ByteArray
   deriving Inhabited

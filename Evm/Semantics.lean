@@ -51,7 +51,7 @@ def executeTransaction
           the sender balance before transaction execution and burned, and is not
           refunded in case of transaction failure."
         -/
-        balance := senderAccount.balance - tx.base.gasLimit * effectiveGasPrice - .ofNat (calcBlobFee header tx)  -- (74)
+        balance := senderAccount.balance - UInt256.ofUInt64 tx.base.gasLimit * effectiveGasPrice - .ofNat (calcBlobFee header tx)  -- (74)
         nonce := senderAccount.nonce + 1 -- (75)
     }
   -- The checkpoint state (73)
@@ -66,7 +66,7 @@ def executeTransaction
       |>.insert header.beneficiary
       |>.union <| Batteries.RBSet.ofList (accessList.map Prod.fst) compare
   -- (81)
-  let gas := .ofNat <| tx.base.gasLimit.toNat - intrinsicCost
+  let gas : UInt64 := .ofNat <| tx.base.gasLimit.toNat - intrinsicCost
   let accessedAccounts := -- (79)
     match tx.base.recipient with
       | some t => baseAccessedAccounts.insert t
@@ -127,12 +127,13 @@ def executeTransaction
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
           | .error e => .error <| .ExecutionException e
   -- The amount to be refunded (82)
-  let gasRefunded := gasRemaining + min ((tx.base.gasLimit - gasRemaining) / 5) substate.refundBalance
+  let gasRefunded : UInt64 :=
+    .ofNat <| gasRemaining.toNat + min ((tx.base.gasLimit.toNat - gasRemaining.toNat) / 5) substate.refundBalance.toNat
   -- The pre-final state (83)
   let accountsWithRefund :=
-    provisionalState.increaseBalance sender (gasRefunded * effectiveGasPrice)
+    provisionalState.increaseBalance sender (UInt256.ofUInt64 gasRefunded * effectiveGasPrice)
 
-  let beneficiaryFee := (tx.base.gasLimit - gasRefunded) * priorityFee
+  let beneficiaryFee := UInt256.ofUInt64 (tx.base.gasLimit - gasRefunded) * priorityFee
   let accountsWithFees :=
     if beneficiaryFee != 0 then
       accountsWithRefund.increaseBalance header.beneficiary beneficiaryFee

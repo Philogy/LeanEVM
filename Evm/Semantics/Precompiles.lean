@@ -20,11 +20,11 @@ namespace Evm.Precompiles
 
 def ecRecover
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ := 3000
 
@@ -52,11 +52,11 @@ def ecRecover
 
 def sha256
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ :=
     let l := env.calldata.size
@@ -75,11 +75,11 @@ def sha256
 
 def ripemd160
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ :=
     let l := env.calldata.size
@@ -98,11 +98,11 @@ def ripemd160
 
 def identity
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ :=
     let l := env.calldata.size
@@ -136,11 +136,11 @@ def expMod (m : ℕ) (b : UInt256) (n : ℕ) : ℕ := expModAux m 1 b.toNat n
 
 def modExp
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let data := env.calldata
   let base_length := nat_of_slice data 0 32
@@ -193,11 +193,11 @@ def modExp
 
 def ecAdd
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ := 150
 
@@ -216,11 +216,11 @@ def ecAdd
 
 def ecMul
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let requiredGas : ℕ := 6000
 
@@ -239,11 +239,11 @@ def ecMul
 
 def ecPairing
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let d := env.calldata
   let k := d.size / 192
@@ -260,11 +260,11 @@ def ecPairing
 
 def blake2f
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let d := env.calldata
   let requiredGas : ℕ := fromByteArrayBigEndian (d.extract 0 4)
@@ -280,11 +280,11 @@ def blake2f
 
 def pointEvaluation
   (accounts : AccountMap)
-  (gas : UInt256)
+  (gas : UInt64)
   (substate : Substate)
   (env : ExecutionEnv)
     :
-  (Bool × AccountMap × UInt256 × Substate × ByteArray)
+  (Bool × AccountMap × UInt64 × Substate × ByteArray)
 :=
   let d := env.calldata
   let requiredGas : ℕ := 50000

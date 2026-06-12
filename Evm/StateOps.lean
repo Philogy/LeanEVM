@@ -48,7 +48,7 @@ def initialiseAccount (addr : AccountAddress) (self : State) : State :=
 def calldataload (self : State) (currentValue : UInt256) : UInt256 :=
   uInt256OfByteArray <| self.executionEnv.calldata.readBytes currentValue.toNat 32
 
-def setNonce! (self : State) (addr : AccountAddress) (nonce : UInt256) : State :=
+def setNonce! (self : State) (addr : AccountAddress) (nonce : UInt64) : State :=
   self.updateAccount! addr (λ acc ↦ { acc with nonce := nonce })
 
 section CodeCopy

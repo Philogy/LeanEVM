@@ -69,6 +69,10 @@ def Nat.fromBlob? (blob : Blob) : Except String ℕ :=
   ((·.1) <| blob.foldr (init := (.ok 0, 0)) λ digit (acc, exp) ↦
     (do pure <| (←acc) + (16 ^ exp) * (←cToHex? digit), exp + 1))
 
+def UInt64.fromBlob? (blob : Blob) : Except String UInt64 := do
+  let n ← Nat.fromBlob? blob
+  if n ≥ UInt64.size then throw "UInt64 overflow" else pure (.ofNat n)
+
 namespace AccountAddress
 
 def fromBlob? (s : Blob) : Except String AccountAddress := (Fin.ofNat _ ·.toNat) <$> UInt256.fromBlob? s

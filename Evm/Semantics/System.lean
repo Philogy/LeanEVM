@@ -12,8 +12,9 @@ open Operation
 private def callArm (fr : Frame) (exec : ExecutionState) (stack : Stack UInt256)
     (gas caller recipient codeAddress value apparentValue inOffset inSize outOffset outSize : UInt256)
     (permission : Bool) : Step := do
-  let m : ℕ := MachineState.M exec.activeWords.toNat inOffset.toNat inSize.toNat
-  let words' : UInt256 := .ofNat <| MachineState.M m outOffset.toNat outSize.toNat
+  let some words' := memoryExpansionWords? exec.activeWords inOffset inSize >>=
+      (memoryExpansionWords? · outOffset outSize)
+    | throw .OutOfGas
   let exec ← charge (Cₘ words' - Cₘ exec.activeWords) exec
   let codeAddress : AccountAddress := AccountAddress.ofUInt256 codeAddress
   let recipient : AccountAddress := AccountAddress.ofUInt256 recipient
@@ -32,10 +33,10 @@ private def callArm (fr : Frame) (exec : ExecutionState) (stack : Stack UInt256)
       stack := stack
       callerAccounts := accounts
       value := value
-      inOffset := inOffset
-      inSize := inSize
-      outOffset := outOffset
-      outSize := outSize }
+      inOffset := inOffset.toUInt64
+      inSize := inSize.toUInt64
+      outOffset := outOffset.toUInt64
+      outSize := outSize.toUInt64 }
   if value ≤ (accounts.find? self |>.option 0 (·.balance)) ∧ depth < 1024 then
     .ok <| .needsCall
       { blobVersionedHashes := exec.executionEnv.blobVersionedHashes
@@ -84,8 +85,8 @@ private def createArm (fr : Frame) (exec : ExecutionState)
       stack := stack
       callerAccounts := accounts
       value := value
-      initOffset := initOffset
-      initSize := initSize
+      initOffset := initOffset.toUInt64
+      initSize := initSize.toUInt64
       initCodeSize := initCode.size }
   let failed : CreateResult :=
     { address := default
@@ -148,14 +149,14 @@ def systemOp (op : SystemOp) (fr : Frame) (exec : ExecutionState) : Step :=
       requireStateMod exec
       let (stack, value, initOffset, initSize) ← exec.stack.pop3
       if initSize > 49152 then throw .OutOfGas
-      let exec ← chargeMemExpansion exec initOffset.toNat initSize.toNat
+      let exec ← chargeMemExpansion exec initOffset initSize
       let exec ← charge (createCost initSize) exec
       createArm fr exec stack value initOffset initSize none
     | .CREATE2 => do
       requireStateMod exec
       let (stack, value, initOffset, initSize, salt) ← exec.stack.pop4
       if initSize > 49152 then throw .OutOfGas
-      let exec ← chargeMemExpansion exec initOffset.toNat initSize.toNat
+      let exec ← chargeMemExpansion exec initOffset initSize
       let exec ← charge (create2Cost initSize) exec
       createArm fr exec stack value initOffset initSize (some <| Evm.UInt256.toByteArray salt)
 

@@ -60,6 +60,25 @@ def ofBitVec (b : BitVec 256) : UInt256 :=
 
 def ofUInt32 (a : UInt32) : UInt256 := ⟨a, 0, 0, 0, 0, 0, 0, 0 ⟩
 
+def ofUInt64 (a : UInt64) : UInt256 :=
+  ⟨a.toUInt32, (a >>> (32 : UInt64)).toUInt32, 0, 0, 0, 0, 0, 0⟩
+
+def toUInt64 (a : UInt256) : UInt64 :=
+  a.l0.toUInt64 ||| (a.l1.toUInt64 <<< (32 : UInt64))
+
+def toUInt64? (a : UInt256) : Option UInt64 :=
+  if a.l2 == 0 && a.l3 == 0 && a.l4 == 0 && a.l5 == 0 && a.l6 == 0 && a.l7 == 0 then
+    some a.toUInt64
+  else
+    none
+
+def toUInt32? (a : UInt256) : Option UInt32 :=
+  if a.l1 == 0 && a.l2 == 0 && a.l3 == 0 && a.l4 == 0 &&
+      a.l5 == 0 && a.l6 == 0 && a.l7 == 0 then
+    some a.l0
+  else
+    none
+
 def toNat (a : UInt256) : ℕ := a.toBitVec.toNat
 
 def ofNat (n : ℕ) : UInt256 :=
