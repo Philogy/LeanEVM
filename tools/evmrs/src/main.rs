@@ -197,34 +197,53 @@ fn snarkv(args: &[String]) {
 
 /// `point-eval <data>` — 192 bytes: versioned_hash | z | y | commitment | proof
 /// → FIELD_ELEMENTS_PER_BLOB(32B) ++ BLS_MODULUS(32B) on success.
+///
+/// Direct single-point KZG verification — `e(C − [y]₁, [1]₂) = e(π, [τ−z]₂)` —
+/// needs only the ceremony's `[τ]₂` point (embedded below), not the full
+/// 4096-point trusted setup, so there is no per-process setup parse.
 fn point_eval(args: &[String]) {
+    use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
     use sha2::{Digest, Sha256};
+
+    /// `[τ]₂` from the Ethereum KZG ceremony (g2_values[1] of the canonical
+    /// trusted setup), compressed.
+    const TAU_G2: &str = "b5bfd7dd8cdeb128843bc287230af38926187075cbfbefa81009a2ce615ac53d2914e5870cb452d2afaaab24f3499f72185cbfee53492714734429b7b38608e23926c911cceceac9a36851477ba4c60b087041de621000edc98edada20c1def2";
+
+    fn scalar_be(b: &[u8]) -> Scalar {
+        let mut le = [0u8; 32];
+        for i in 0..32 {
+            le[i] = b[31 - i];
+        }
+        Option::<Scalar>::from(Scalar::from_bytes(&le)).unwrap_or_else(|| err())
+    }
+    fn g1(b: &[u8]) -> G1Affine {
+        let bytes: [u8; 48] = b.try_into().unwrap_or_else(|_| err());
+        Option::<G1Affine>::from(G1Affine::from_compressed(&bytes)).unwrap_or_else(|| err())
+    }
+
     let data = unhex(args.first().map(String::as_str).unwrap_or(""));
     if data.len() != 192 {
         err();
     }
     let versioned_hash = &data[0..32];
-    let z: [u8; 32] = data[32..64].try_into().unwrap();
-    let y: [u8; 32] = data[64..96].try_into().unwrap();
-    let commitment: [u8; 48] = data[96..144].try_into().unwrap();
-    let proof: [u8; 48] = data[144..192].try_into().unwrap();
+    let z = scalar_be(&data[32..64]);
+    let y = scalar_be(&data[64..96]);
+    let commitment = g1(&data[96..144]);
+    let proof = g1(&data[144..192]);
 
-    let mut expected = Sha256::digest(commitment);
+    let mut expected = Sha256::digest(&data[96..144]);
     expected[0] = 0x01;
     if versioned_hash != expected.as_slice() {
         err();
     }
 
-    let settings = c_kzg::ethereum_kzg_settings(0);
-    let ok = settings
-        .verify_kzg_proof(
-            &c_kzg::Bytes48::new(commitment),
-            &c_kzg::Bytes32::new(z),
-            &c_kzg::Bytes32::new(y),
-            &c_kzg::Bytes48::new(proof),
-        )
-        .unwrap_or_else(|_| err());
-    if !ok {
+    let tau_bytes: [u8; 96] = hex::decode(TAU_G2).unwrap().try_into().unwrap();
+    let tau_g2 = Option::<G2Affine>::from(G2Affine::from_compressed(&tau_bytes)).unwrap();
+
+    // e(C - [y]G₁, [1]₂) == e(π, [τ]₂ - [z]G₂)
+    let lhs_g1 = G1Affine::from(G1Projective::from(commitment) - G1Projective::generator() * y);
+    let rhs_g2 = G2Affine::from(G2Projective::from(tau_g2) - G2Projective::generator() * z);
+    if pairing(&lhs_g1, &G2Affine::generator()) != pairing(&proof, &rhs_g2) {
         err();
     }
     // FIELD_ELEMENTS_PER_BLOB = 4096, BLS_MODULUS — fixed return per EIP-4844.

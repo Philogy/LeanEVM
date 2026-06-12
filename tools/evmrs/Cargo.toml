@@ -10,7 +10,7 @@ ripemd = "0.1"
 sha2 = "0.10"
 k256 = { version = "0.13", features = ["ecdsa"] }
 bn = { package = "substrate-bn", version = "0.6" }
-c-kzg = { version = "2.1", features = ["ethereum_kzg_settings"] }
+bls12_381 = "0.8"
 alloy-trie = "0.9"
 alloy-primitives = "1"
 
