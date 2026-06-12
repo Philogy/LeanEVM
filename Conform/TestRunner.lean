@@ -658,9 +658,9 @@ per test.
 def processTestFile (path : System.FilePath) (isToBeTested : String → Bool)
                     (isTimed : Option Nat := .none)
                     (abort : Option (IO.Ref Bool) := .none) :
-                    IO (Array TestId × Array (TestId × TestResult)) := do
+                    IO (Array TestId × Array (TestId × TestResult × Nat)) := do
   let mut discarded : Array TestId := .empty
-  let mut results : Array (TestId × TestResult) := .empty
+  let mut results : Array (TestId × TestResult × Nat) := .empty
   let file ← Lean.Json.fromFile path
   let testNames := (Parser.testNamesOfTest file).toOption.getD #[] |>.filter isToBeTested
   for testName in testNames do
@@ -672,7 +672,11 @@ def processTestFile (path : System.FilePath) (isToBeTested : String → Bool)
     | .error _ => IO.eprintln s!"Cannot parse: {testId}"
                   discarded := discarded.push testId
     | .ok test => if test.network.startsWith "Cancun"
-                  then results := results.push (testId, ←processTest test <| isTimed <&> (·, testId))
+                  then do
+                    let t₀ ← IO.monoMsNow
+                    let res ← processTest test <| isTimed <&> (·, testId)
+                    let t₁ ← IO.monoMsNow
+                    results := results.push (testId, res, t₁ - t₀)
   return (discarded, results)
 
 end Conform

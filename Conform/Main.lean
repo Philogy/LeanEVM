@@ -21,8 +21,8 @@ instance : ToString TestResult where
   toString tr := tr.elim "Success." id
 
 open Evm.Conform in
-def log (testFile : System.FilePath) (testName : String) (result : TestResult) (phase : ℕ := 0) : IO Unit :=
-  IO.FS.withFile (logFile phase) .append λ h ↦ h.putStrLn s!"{testFile.fileName.get!}[{testName}] - {result}\n"
+def log (testFile : System.FilePath) (testName : String) (result : TestResult) (elapsedMs : ℕ) (phase : ℕ := 0) : IO Unit :=
+  IO.FS.withFile (logFile phase) .append λ h ↦ h.putStrLn s!"{testFile.fileName.get!}[{testName}] - {result} -- {elapsedMs}ms\n"
 
 def directoryBlacklist : List System.FilePath := []
 
@@ -73,8 +73,8 @@ def testFiles (root               : System.FilePath)
       else
       let r ← Evm.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none)
         (abort := if failFast.isSome then some abort else none)
-      let batchFails := r.2.filter (·.2.isSome)
-      for ((file, test), _) in batchFails do
+      let batchFails := r.2.filter (·.2.1.isSome)
+      for ((file, test), _, _) in batchFails do
         IO.println s!"FAIL {file.fileName.getD file.toString}[{test}]"
         if let some expected := failFast then
           if !expected.contains s!"{file.fileName.getD file.toString}[{test}]" then
@@ -92,8 +92,8 @@ def testFiles (root               : System.FilePath)
   let testResults ← tasks.mapM (IO.wait · >>= IO.ofExcept)
   for (discarded, batch) in testResults do
     discardedFiles := discardedFiles.append discarded
-    for ((file, test), res) in batch do
-      log file test res phase
+    for ((file, test), res, ms) in batch do
+      log file test res ms phase
       if res.isNone
       then numSuccess := numSuccess + 1
       else failedTests := failedTests.push s!"{file.fileName.getD file.toString}[{test}]"
