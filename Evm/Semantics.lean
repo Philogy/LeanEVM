@@ -1,4 +1,4 @@
-import Evm.Gas
+import Evm.Semantics.Gas
 import Evm.Semantics.Call
 import Evm.Semantics.Create
 import Evm.Semantics.Decode

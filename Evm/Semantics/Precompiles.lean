@@ -7,12 +7,12 @@ import Evm.State.ExecutionEnv
 import Evm.Exception
 import Evm.Wheels
 
-import Evm.EllipticCurves
-import Evm.RIP160
-import Evm.BN_ADD
-import Evm.BN_MUL
-import Evm.SNARKV
-import Evm.PointEval
+import Evm.Crypto.EllipticCurves
+import Evm.Crypto.RIP160
+import Evm.Crypto.BN_ADD
+import Evm.Crypto.BN_MUL
+import Evm.Crypto.SNARKV
+import Evm.Crypto.PointEval
 
 import Evm.FFI.ffi
 

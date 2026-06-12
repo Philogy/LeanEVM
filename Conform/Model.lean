@@ -7,7 +7,7 @@ import Evm.Wheels
 import Evm.State.Withdrawal
 import Evm.State.Block
 
-import Evm.ExecutionState
+import Evm.Machine.ExecutionState
 
 import Conform.Wheels
 

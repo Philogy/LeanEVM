@@ -1,5 +1,5 @@
 import Evm.UInt256
-import Evm.MachineState
+import Evm.Machine.MachineState
 
 import Mathlib.Data.Finmap
 

@@ -1,7 +1,7 @@
-import Evm.SharedState
+import Evm.Machine.SharedState
 import Evm.StateOps
-import Evm.MachineStateOps
-import Evm.MachineState
+import Evm.Machine.MachineStateOps
+import Evm.Machine.MachineState
 import Evm.Operations
 import Mathlib.Data.List.Intervals
 

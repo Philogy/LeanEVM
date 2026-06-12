@@ -1,5 +1,5 @@
 import Evm.State
-import Evm.MachineState
+import Evm.Machine.MachineState
 
 namespace Evm
 

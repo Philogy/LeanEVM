@@ -1,11 +1,11 @@
-import Evm.ExecutionStateOps
-import Evm.Gas
-import Evm.GasConstants
-import Evm.MachineStateOps
+import Evm.Machine.ExecutionStateOps
+import Evm.Semantics.Gas
+import Evm.Semantics.GasConstants
+import Evm.Machine.MachineStateOps
 import Evm.Semantics.Decode
 import Evm.Semantics.Frame
 import Evm.Semantics.Params
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 namespace Evm
 

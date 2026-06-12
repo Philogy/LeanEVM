@@ -1,12 +1,12 @@
 import Mathlib.Data.Nat.Log
-import Evm.ExecutionState
-import Evm.ExecutionStateOps
-import Evm.Data.Stack
+import Evm.Machine.ExecutionState
+import Evm.Machine.ExecutionStateOps
+import Evm.Machine.Stack
 
 import Evm.State
 import Evm.StateOps
-import Evm.MachineStateOps
-import Evm.GasConstants
+import Evm.Machine.MachineStateOps
+import Evm.Semantics.GasConstants
 
 namespace Evm
 

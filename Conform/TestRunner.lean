@@ -1,6 +1,6 @@
-import Evm.ExecutionState
+import Evm.Machine.ExecutionState
 import Evm.Semantics
-import Evm.Gas
+import Evm.Semantics.Gas
 import Evm.Wheels
 
 import Evm.State.TransactionOps

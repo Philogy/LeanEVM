@@ -1,5 +1,5 @@
 import Evm.Maps.StorageMap
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 import Evm.UInt256
 import Evm.Wheels

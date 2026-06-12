@@ -1,10 +1,10 @@
-import Evm.Gas
-import Evm.GasConstants
+import Evm.Semantics.Gas
+import Evm.Semantics.GasConstants
 import Evm.Semantics.Call
 import Evm.Semantics.Create
 import Evm.Semantics.Decode
 import Evm.Semantics.Frame
-import Evm.Step
+import Evm.Semantics.Instructions
 
 namespace Evm
 

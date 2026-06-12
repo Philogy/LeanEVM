@@ -1,8 +1,8 @@
 import Batteries.Data.RBMap
 
-import Evm.MachineState
+import Evm.Machine.MachineState
 
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 namespace Evm
 

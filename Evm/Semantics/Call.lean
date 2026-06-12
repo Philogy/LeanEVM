@@ -1,7 +1,7 @@
-import Evm.ExecutionStateOps
-import Evm.MachineStateOps
+import Evm.Machine.ExecutionStateOps
+import Evm.Machine.MachineStateOps
 import Evm.Maps.AccountMap
-import Evm.Precompiles
+import Evm.Semantics.Precompiles
 import Evm.Semantics.Decode
 import Evm.Semantics.Frame
 import Evm.Semantics.Params

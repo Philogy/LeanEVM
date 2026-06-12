@@ -1,17 +1,17 @@
 import Evm.Wheels
 import Evm.PerformIO
-import Evm.Evmrs
+import Evm.Crypto.Evmrs
 import Conform.Wheels
 
-def blobPointEval (data : String) : String :=
+def blobSNARKV (data : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     evmrsCommandOfInput data
   where evmrsCommandOfInput (data : String) : IO.Process.SpawnArgs := {
     cmd := evmrsExe,
-    args := #["point-eval", data]
+    args := #["snarkv", data]
   }
 
-def PointEval (data : ByteArray) : Except String ByteArray :=
-  match blobPointEval (toHex data) with
-    | "error" => .error "PointEval failed"
+def SNARKV (data : ByteArray) : Except String ByteArray :=
+  match blobSNARKV (toHex data) with
+    | "error" => .error "SNARKV failed"
     | s => ByteArray.ofBlob s

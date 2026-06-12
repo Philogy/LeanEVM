@@ -1,4 +1,4 @@
-import Evm.ExecutionState
+import Evm.Machine.ExecutionState
 import Evm.Semantics.Params
 
 namespace Evm

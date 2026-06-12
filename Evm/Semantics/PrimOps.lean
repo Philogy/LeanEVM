@@ -1,11 +1,11 @@
-import Evm.Data.Stack
+import Evm.Machine.Stack
 
 import Evm.State
 import Evm.Exception
 import Evm.StateOps
-import Evm.SharedStateOps
-import Evm.ExecutionState
-import Evm.ExecutionStateOps
+import Evm.Machine.SharedStateOps
+import Evm.Machine.ExecutionState
+import Evm.Machine.ExecutionStateOps
 
 namespace Evm
 

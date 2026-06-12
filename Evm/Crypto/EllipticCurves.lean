@@ -1,8 +1,8 @@
 import Evm.Wheels
 import Evm.PerformIO
-import Evm.Evmrs
+import Evm.Crypto.Evmrs
 import Conform.Wheels
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 def secp256k1n : ℕ := 115792089237316195423570985008687907852837564279074904382605163141518161494337
 

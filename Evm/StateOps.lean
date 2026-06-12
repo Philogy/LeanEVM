@@ -5,7 +5,7 @@ import Evm.Maps.AccountMap
 
 import Evm.State
 import Evm.Wheels
-import Evm.GasConstants
+import Evm.Semantics.GasConstants
 
 namespace Evm
 

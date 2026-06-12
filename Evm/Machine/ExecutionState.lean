@@ -1,7 +1,7 @@
-import Evm.Data.Stack
+import Evm.Machine.Stack
 
 import Evm.State
-import Evm.SharedState
+import Evm.Machine.SharedState
 
 namespace Evm
 

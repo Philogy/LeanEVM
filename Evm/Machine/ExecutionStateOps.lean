@@ -1,7 +1,7 @@
 import Mathlib.Data.List.Intervals
 
 import Evm.UInt256
-import Evm.ExecutionState
+import Evm.Machine.ExecutionState
 import Evm.State.AccountOps
 import Evm.StateOps
 

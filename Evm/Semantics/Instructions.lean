@@ -3,16 +3,16 @@ import Evm.Operations
 
 import Evm.State
 import Evm.Exception
-import Evm.PrimOps
+import Evm.Semantics.PrimOps
 import Evm.StateOps
 import Evm.Wheels
 
 import Evm.UInt256
 import Evm.StateOps
-import Evm.SharedStateOps
-import Evm.MachineStateOps
+import Evm.Machine.SharedStateOps
+import Evm.Machine.MachineStateOps
 
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 --
 
@@ -20,7 +20,7 @@ import Mathlib.Data.BitVec
 import Mathlib.Data.Array.Defs
 import Mathlib.Data.Finmap
 import Mathlib.Data.List.Defs
-import Evm.Data.Stack
+import Evm.Machine.Stack
 
 import Evm.Maps.AccountMap
 import Evm.Maps.AccountMap
@@ -31,21 +31,21 @@ import Evm.State.Substate
 import Evm.State.TransactionOps
 
 import Evm.Exception
-import Evm.Gas
-import Evm.GasConstants
+import Evm.Semantics.Gas
+import Evm.Semantics.GasConstants
 import Evm.State
 import Evm.StateOps
 import Evm.Exception
 import Evm.Instr
-import Evm.Precompiles
+import Evm.Semantics.Precompiles
 
 import Evm.Operations
 import Evm.Pretty
-import Evm.SharedStateOps
+import Evm.Machine.SharedStateOps
 import Evm.Wheels
-import Evm.EllipticCurves
+import Evm.Crypto.EllipticCurves
 import Evm.UInt256
-import Evm.MachineState
+import Evm.Machine.MachineState
 
 --
 

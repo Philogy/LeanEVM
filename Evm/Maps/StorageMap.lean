@@ -22,7 +22,7 @@ import Mathlib.Data.Multiset.Sort
 
 import Evm.Wheels
 import Evm.State.TrieRoot
-import Evm.SpongeHash.Keccak256
+import Evm.Crypto.Keccak256
 
 import Evm.FFI.ffi
 
