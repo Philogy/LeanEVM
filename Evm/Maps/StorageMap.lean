@@ -36,7 +36,7 @@ abbrev Storage : Type := Batteries.RBMap UInt256 UInt256 compare
 def Storage.toFinmap (self : Storage) : Finmap (λ _ : UInt256 ↦ UInt256) :=
   self.foldl (init := ∅) λ acc k v ↦ acc.insert k v
 
-def Storage.toEvmYulStorage (self : Storage) : Evm.Storage :=
+def Storage.toEvmStorage (self : Storage) : Evm.Storage :=
   self.foldl (init := ∅) λ acc k v ↦ acc.insert k v
 
 def toBlobs (pair : UInt256 × UInt256) : Option (String × String) := do

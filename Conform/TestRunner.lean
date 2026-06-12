@@ -35,7 +35,7 @@ def PersistentAccountMap.toAccountMap (self : PersistentAccountMap) : AccountMap
         nonce    := acc.nonce
         balance  := acc.balance
         code     := acc.code
-        storage  := acc.storage.toEvmYulStorage
+        storage  := acc.storage.toEvmStorage
       }
     s.insert addr account
 
@@ -48,7 +48,7 @@ def PersistentAccountMap.toEVMState (self : PersistentAccountMap) : ExecutionSta
         nonce    := acc.nonce
         balance  := acc.balance
         code     := acc.code
-        storage  := acc.storage.toEvmYulStorage
+        storage  := acc.storage.toEvmStorage
       }
     { s with toState := s.setAccount addr account }
 
@@ -92,7 +92,7 @@ section
 This section exists for debugging / testing mostly. It's somewhat ad-hoc.
 -/
 
-private def almostBEqButNotQuiteEvmYulState (s₁ s₂ : PersistentAccountMap) : Except String Bool := do
+private def statesAlmostBEq (s₁ s₂ : PersistentAccountMap) : Except String Bool := do
   if s₁ == s₂ then .ok true else throw "state mismatch"
 
 /--
@@ -102,7 +102,7 @@ This is morally `s₁ == s₂` except we get a convenient way to both tune what 
 as well as report fine grained errors.
 -/
 private def almostBEqButNotQuite (s₁ s₂ : PersistentAccountMap) : Except String Bool := do
-  discard <| almostBEqButNotQuiteEvmYulState s₁ s₂
+  discard <| statesAlmostBEq s₁ s₂
   pure true -- Yes, we never return false, because we throw along the way. Yes, this is `Option`.
 
 end
