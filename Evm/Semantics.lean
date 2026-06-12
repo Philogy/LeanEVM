@@ -5,6 +5,9 @@ import Evm.Semantics.Decode
 import Evm.Semantics.Frame
 import Evm.Semantics.Interpreter
 import Evm.Semantics.Params
+import Evm.Semantics.Halt
+import Evm.Semantics.Smsf
+import Evm.Semantics.System
 import Evm.Semantics.Dispatch
 import Evm.State.TransactionOps
 import Evm.StateOps

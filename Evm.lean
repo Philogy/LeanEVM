@@ -30,6 +30,9 @@ import Evm.Semantics.Decode
 import Evm.Semantics.Frame
 import Evm.Semantics.Gas
 import Evm.Semantics.GasConstants
+import Evm.Semantics.Halt
+import Evm.Semantics.Smsf
+import Evm.Semantics.System
 import Evm.Semantics.Dispatch
 import Evm.Semantics.Interpreter
 import Evm.Semantics.Params

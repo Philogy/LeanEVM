@@ -52,7 +52,8 @@ The `Push` instruction also returns the argument as an EVM word along with the w
 -/
 def decode (arr : ByteArray) (pc : UInt256) :
   Option (Operation × Option (UInt256 × Nat)) := do
-  let instr ← arr.get? pc.toNat >>= Evm.parseInstr
+  let byte ← arr.get? pc.toNat
+  let instr := Evm.parseInstr byte
   let argWidth := pushArgWidth instr
   .some (
     instr,
@@ -62,9 +63,11 @@ def decode (arr : ByteArray) (pc : UInt256) :
   )
 
 partial def validJumpDestsAux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
-  match c.get? i.toNat >>= Evm.parseInstr with
+  match c.get? i.toNat with
     | none => result
-    | some cᵢ => validJumpDestsAux c (nextInstrPos i cᵢ) (if cᵢ = .JUMPDEST then result.push i else result)
+    | some byte =>
+      let cᵢ := Evm.parseInstr byte
+      validJumpDestsAux c (nextInstrPos i cᵢ) (if cᵢ = .JUMPDEST then result.push i else result)
 
 def validJumpDests (c : ByteArray) (i : UInt256) : Array UInt256 :=
   validJumpDestsAux c i #[]

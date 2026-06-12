@@ -14,7 +14,7 @@ namespace Evm
 
 /--
 Strip the existing `repr` a'la:
-- Evm.Operation.Push (Evm.Operation.POp.PUSH1) → PUSH1
+- Evm.Operation.Push (Evm.Operation.PushOp.PUSH1) → PUSH1
 
 This breaks the moment that `Repr` changes its behaviour; it is fine for the time being.
 -/
