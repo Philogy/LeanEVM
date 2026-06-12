@@ -77,13 +77,6 @@ private def checkExceptionalHalt (validJumps : Array UInt256) (w : Operation) (e
 
   pure (evmState, cost₂)
 
-/-- The normal-halt discriminator `H` (eq. 146-ish). -/
-private def normalHaltOutput (machine : MachineState) (w : Operation) : Option ByteArray :=
-  match w with
-    | .RETURN | .REVERT => some machine.output
-    | .STOP | .SELFDESTRUCT => some .empty
-    | _ => none
-
 /--
 Shared tail of the CALL-family instructions: compute the child's gas
 allowance, charge the instruction cost, read the input data, and either
@@ -94,7 +87,7 @@ result.
 private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
     (stack : Stack UInt256)
     (gas caller recipient codeAddress value apparentValue inOffset inSize outOffset outSize : UInt256)
-    (permission : Bool) : StepOutcome :=
+    (permission : Bool) : Signal :=
   let codeAddress : AccountAddress := AccountAddress.ofUInt256 codeAddress
   let recipient : AccountAddress := AccountAddress.ofUInt256 recipient
   let caller : AccountAddress := AccountAddress.ofUInt256 caller
@@ -158,7 +151,7 @@ fail — complete the instruction immediately with a failed-creation result.
 -/
 private def prepareCreate (fr : Frame) (evmState : ExecutionState)
     (stack : Stack UInt256) (value initOffset initSize : UInt256)
-    (salt : Option ByteArray) : Except ExecutionException StepOutcome := do
+    (salt : Option ByteArray) : Except ExecutionException Signal := do
   let initCode := evmState.memory.readWithPadding initOffset.toNat initSize.toNat
   let env := evmState.executionEnv
   let self := env.address
@@ -218,8 +211,38 @@ frame's state. CALL/CREATE-family instructions suspend the frame instead of
 recursing; everything else is `stepPrimop`.
 -/
 private def execInstr (fr : Frame) (instr : Operation) (arg : Option (UInt256 × Nat))
-    (gasCost : ℕ) : Except ExecutionException StepOutcome := do
+    (gasCost : ℕ) : Except ExecutionException Signal := do
   match instr with
+    | .STOP | .SELFDESTRUCT =>
+      -- Normal halt with empty output (the YP's `H` cases without a payload).
+      let exec' ← stepPrimop instr arg
+        { fr.exec with
+            execLength := fr.exec.execLength + 1
+            gasAvailable := fr.exec.gasAvailable - UInt256.ofNat gasCost }
+      return .halted (.success exec' .empty)
+    | .RETURN | .REVERT =>
+      -- Normal halt / revert carrying m[μs[0] ... (μs[0] + μs[1] − 1)].
+      let evmState :=
+        { fr.exec with
+            execLength := fr.exec.execLength + 1
+            gasAvailable := fr.exec.gasAvailable - UInt256.ofNat gasCost }
+      let (stack, offset, size) ← evmState.stack.pop2
+      let output := evmState.memory.readWithPadding offset.toNat size.toNat
+      let machine :=
+        { evmState.toMachineState with
+            activeWords := .ofNat <| MachineState.M evmState.activeWords.toNat offset.toNat size.toNat }
+      let exec' := { evmState with toMachineState := machine }.replaceStackAndIncrPC stack
+      if instr = .REVERT then
+        /-
+          The Yellow Paper says we don't call the "iterator function" "O" for `REVERT`,
+          but we actually have to run the semantics of `REVERT` (memory read and
+          activeWords expansion) to pass the test
+          EthereumTests/BlockchainTests/GeneralStateTests/stReturnDataTest/returndatacopy_after_revert_in_staticcall.json
+          And the EEL spec does so too.
+        -/
+        return .halted (.revert exec'.gasAvailable output)
+      else
+        return .halted (.success exec' output)
     | .CREATE =>
       let evmState :=
         { fr.exec with
@@ -274,36 +297,23 @@ private def execInstr (fr : Frame) (instr : Operation) (arg : Option (UInt256 ×
 
 /--
 Execute one instruction of the frame: decode at the pc (an out-of-code pc
-reads as STOP), run the exceptional-halt checks `Z`, execute, and classify
-the result via the normal-halt discriminator `H`.
+reads as STOP), run the exceptional-halt checks `Z`, and execute. Halting
+instructions signal `.halted` (with their payload) directly from `execInstr`.
 -/
-def stepFrame (fr : Frame) : StepOutcome :=
+def stepFrame (fr : Frame) : Signal :=
   let evmState := fr.exec
   let (w, arg) := decode evmState.executionEnv.code evmState.pc |>.getD (.STOP, .none)
   match checkExceptionalHalt fr.validJumps w evmState with
-    | .error e => .halt (.exception e)
+    | .error e => .halted (.exception e)
     | .ok (evmState, cost₂) =>
       -- Every instruction's net stack effect is exactly `α − δ` (stackPushCount − stackPopCount) (the
       -- StackOverflow check above is predicated on this), so the cached
       -- stack size can be maintained without walking the stack.
       let stackSize' := evmState.stackSize - (stackPopCount w).getD 0 + (stackPushCount w).getD 0
       match execInstr { fr with exec := evmState } w arg cost₂ with
-        | .error e => .halt (.exception e)
+        | .error e => .halted (.exception e)
         | .ok (.next exec') =>
-          let exec' := { exec' with stackSize := stackSize' }
-          match normalHaltOutput exec'.toMachineState w with
-            | none => .next exec'
-            | some o =>
-              if w == .REVERT then
-                /-
-                  The Yellow Paper says we don't call the "iterator function" "O" for `REVERT`,
-                  but we actually have to call the semantics of `REVERT` to pass the test
-                  EthereumTests/BlockchainTests/GeneralStateTests/stReturnDataTest/returndatacopy_after_revert_in_staticcall.json
-                  And the EEL spec does so too.
-                -/
-                .halt (.revert exec'.gasAvailable o)
-              else
-                .halt (.success exec' o)
+          .next { exec' with stackSize := stackSize' }
         | .ok (.needsCall params pending) =>
           -- The suspended frame resumes with the popped stack plus the pushed
           -- success flag — its length is the predicted `α − δ` (stackPushCount − stackPopCount) net effect.

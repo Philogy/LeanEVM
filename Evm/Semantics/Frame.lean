@@ -81,12 +81,16 @@ inductive Pending where
   | call   (pending : PendingCall)
   | create (pending : PendingCreate)
 
-/-- The result of executing one instruction of a frame. -/
-inductive StepOutcome where
+/--
+The result of executing one instruction of a frame — what the instruction
+signals back to the driver. Halting instructions emit `.halted` (with the
+payload) directly.
+-/
+inductive Signal where
   /-- The frame continues with the updated execution state. -/
   | next (exec : ExecutionState)
   /-- The frame halted (normally, by revert, or exceptionally). -/
-  | halt (halt : FrameHalt)
+  | halted (halt : FrameHalt)
   /-- The instruction was a CALL-family instruction: suspend and descend. -/
   | needsCall (params : CallParams) (pending : PendingCall)
   /-- The instruction was CREATE/CREATE2: suspend and descend. -/

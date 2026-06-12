@@ -55,7 +55,7 @@ def drive (fuel : ℕ) (stack : List Pending) (state : Frame ⊕ FrameResult) :
         | .inl current =>
           match stepFrame current with
             | .next exec => drive fuel stack (.inl { current with exec := exec })
-            | .halt halt => drive fuel stack (.inr (endFrame current halt))
+            | .halted halt => drive fuel stack (.inr (endFrame current halt))
             | .needsCall params pending =>
               match beginCall params with
                 | .inl child => drive fuel (.call pending :: stack) (.inl child)

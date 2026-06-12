@@ -213,8 +213,8 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
     | .LOG2 => log2Op
     | .LOG3 => log3Op
     | .LOG4 => log4Op
-    | .RETURN => binaryMachineStateOp MachineState.evmReturn
-    | .REVERT => binaryMachineStateOp MachineState.evmRevert
+    -- RETURN/REVERT live in `execInstr` (Step.lean): they halt the frame,
+    -- delivering their payload in the `Signal`.
     | .SELFDESTRUCT =>
       λ evmState ↦
         match evmState.stack.pop with

@@ -89,20 +89,6 @@ def returndatacopy (self : MachineState) (mstart rstart size : UInt256) : Machin
   }
 
 
-def evmReturn (self : MachineState) (mstart s : UInt256) : MachineState :=
-  { self with
-    output := self.memory.readWithPadding mstart.toNat s.toNat
-    activeWords :=
-      .ofNat <| MachineState.M self.activeWords.toNat mstart.toNat s.toNat
-  }
-
-def evmRevert (self : MachineState) (mstart s : UInt256) : MachineState :=
-  let self := self.evmReturn mstart s
-  { self with
-    activeWords :=
-      .ofNat <| MachineState.M self.activeWords.toNat mstart.toNat s.toNat
-  }
-
 end ReturnData
 
 def keccak256 (self : MachineState) (mstart s : UInt256) : UInt256 × MachineState :=
