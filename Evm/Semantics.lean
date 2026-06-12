@@ -426,6 +426,12 @@ def X (fuel : ℕ) (validJumps : Array UInt256) (evmState : ExecutionState)
           | _ => false
       -- Exceptional halting (158)
       let Z (evmState : ExecutionState) : Except ExecutionException (ExecutionState × ℕ) := do
+        -- The stack-depth check precedes the cost computations: both
+        -- memoryExpansionCost and C' peek at stack slots with `!`.
+        if δ w = none then
+          .error .InvalidInstruction
+        if evmState.stack.length < (δ w).getD 0 then
+          .error .StackUnderflow
         let cost₁ := memoryExpansionCost evmState w
         if evmState.gasAvailable.toNat < cost₁ then
           .error .OutOfGass
@@ -435,12 +441,6 @@ def X (fuel : ℕ) (validJumps : Array UInt256) (evmState : ExecutionState)
 
         if evmState.gasAvailable.toNat < cost₂ then
           .error .OutOfGass
-
-        if δ w = none then
-          .error .InvalidInstruction
-
-        if evmState.stack.length < (δ w).getD 0 then
-          .error .StackUnderflow
 
         let invalidJump := notIn evmState.stack[0]? validJumps
 

@@ -49,7 +49,6 @@ def Ξ_ECREC
           | .ok s =>
               ffi.ByteArray.zeroes 12 ++ (ffi.KEC s).extract 12 32
           | .error e =>
-            dbg_trace s!"Ξ_ECREC failed: {e}"
             .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
@@ -73,7 +72,6 @@ def Ξ_SHA256
       match ffi.SHA256 I.calldata with
         | .ok s => s
         | .error e =>
-          dbg_trace s!"Ξ_SHA56 failed: {e}"
           .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
@@ -97,7 +95,6 @@ def Ξ_RIP160
       match RIP160 I.calldata with
         | .ok s => s
         | .error e =>
-          dbg_trace s!"Ξ_RIP160 failed: {e}"
           .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
@@ -234,7 +231,6 @@ def Ξ_BN_ADD
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
-        dbg_trace s!"Ξ_BN_ADD failed: {e}"
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
 
@@ -288,7 +284,6 @@ def Ξ_BN_MUL
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
-        dbg_trace s!"Ξ_BN_MUL failed: {e}"
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
 
@@ -326,7 +321,6 @@ def Ξ_SNARKV
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
-        dbg_trace s!"Ξ_SNARKV failed: {e}"
         (false, ∅, 0, A, .empty)
 
 private def snarkvOutput :=
@@ -355,14 +349,12 @@ def Ξ_BLAKE2_F
   let gᵣ : ℕ := fromByteArrayBigEndian (d.extract 0 4)
 
   if g.toNat < gᵣ then
-    dbg_trace "failed"
     (false, ∅, 0, A, .empty)
   else
     let o := ffi.BLAKE2 d
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
-        dbg_trace s!"Ξ_BLAKE2_F failed: {e}"
         (false, ∅, 0, A, .empty)
 
 def Ξ_PointEval
@@ -383,5 +375,4 @@ def Ξ_PointEval
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
-        dbg_trace s!"Ξ_PointEval failed: {e}"
         (false, ∅, 0, A, .empty)
