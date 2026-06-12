@@ -41,8 +41,6 @@ def testFiles (root               : System.FilePath)
               (testWhitelist      : Array String := #[])
               (fileFilter         : String := "")
               (phase              : ℕ)
-              (threads            : ℕ := 1)
-              (timed              : Bool := false)
               (expectedToFail     : Std.HashSet String := {})
               (failFast           : Bool := false) : IO (Nat × Array String) := do
   let isToBeTested (testname : String) : Bool :=
@@ -119,7 +117,7 @@ def testFiles (root               : System.FilePath)
 
 def nproc : IO Nat := do
   let out ← IO.Process.output {cmd := "nproc", stdin := .null}
-  return out.stdout.trim.toNat? |>.getD 1
+  return out.stdout.trimAscii.toNat? |>.getD 1
 
 def main (args : List String) : IO UInt32 := do
   -- `--fail-fast`: the first failure outside ExpectedToFail aborts the run.
@@ -128,7 +126,9 @@ def main (args : List String) : IO UInt32 := do
   let failFastFlag := args.contains "--fail-fast"
   let perfFlag := args.contains "--perf"
   let args := args.filter (λ a ↦ a ≠ "--fail-fast" ∧ a ≠ "--perf")
-  let NumThreads : ℕ := args.head? <&> String.toNat! |>.getD (←nproc)
+  -- The first positional arg is accepted for compatibility but the task pool
+  -- is sized at startup: set LEAN_NUM_THREADS to control parallelism.
+  let _threadCount : ℕ := args.head? <&> String.toNat! |>.getD (←nproc)
 
   let ExpectedToFail : Std.HashSet String := {
     "invalid_block_blob_count.json[src/GeneralStateTestsFiller/Pyspecs/cancun/eip4844_blobs/test_blob_txs.py::test_invalid_block_blob_count[fork_Cancun-blockchain_test--blobs_per_tx_(7,)]]",
@@ -155,7 +155,6 @@ def main (args : List String) : IO UInt32 := do
     let failed ← testFiles (root := "EthereumTests/BlockchainTests/")
                            (fileFilter := pat)
                            (phase := 0)
-                           (threads := NumThreads)
                            (expectedToFail := ExpectedToFail)
                            (failFast := failFastFlag) >>= printResults
     return if (Std.HashSet.ofArray failed |>.diff ExpectedToFail).isEmpty then 0 else 1
@@ -165,7 +164,6 @@ def main (args : List String) : IO UInt32 := do
                           (directoryBlacklist := #["EthereumTests/BlockchainTests//GeneralStateTests/VMTests/vmPerformance"])
                           (testBlacklist := PerfTests)
                           (phase := 1)
-                          (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
                           (failFast := failFastFlag) >>= printResults
 
@@ -175,14 +173,12 @@ def main (args : List String) : IO UInt32 := do
   IO.println s!"Phase 2 - Throughput tests (--perf)."
   let failed₂ ← testFiles (root := "EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmPerformance/")
                           (phase := 2)
-                          (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
                           (failFast := failFastFlag) >>= printResults
 
   let failed₃ ← testFiles (root := "EthereumTests/BlockchainTests/")
                           (testWhitelist := PerfTests)
                           (phase := 3)
-                          (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
                           (failFast := failFastFlag) >>= printResults
 

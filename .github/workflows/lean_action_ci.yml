@@ -1,4 +1,4 @@
-name: Lean Action CI
+name: CI
 
 on:
   push:
@@ -6,9 +6,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-conform:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
+
+      # The conformance fixtures (ethereum/tests) — shallow, the pinned
+      # commit's tree is all the runner needs. Doing it here keeps the
+      # lakefile's fallback `git submodule update --init` (non-shallow)
+      # from firing during the build.
+      - name: Fetch conformance fixtures
+        run: git submodule update --init --depth 1
+
+      # Builds the Evm and Conform libraries (plus tools/evmrs via cargo —
+      # rust is preinstalled on the runner) and then runs `lake test`,
+      # which is the conform executable: the full conformance phase,
+      # 22,308 tests. Exit code 0 requires every test to pass except the
+      # ExpectedToFail list in Conform/Main.lean.
       - uses: leanprover/lean-action@v1
+        with:
+          use-mathlib-cache: true
+          test: true

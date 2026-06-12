@@ -20,7 +20,7 @@ section FromJson
 
 open Lean (FromJson Json)
 
-private def fromBlobString {α} (f : Blob → Except String α) : FromJson α :=
+@[reducible] private def fromBlobString {α} (f : Blob → Except String α) : FromJson α :=
   {
     fromJson? := λ json ↦ json.getStr? >>= (getBlob? · >>= f)
   }

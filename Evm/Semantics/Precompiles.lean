@@ -46,7 +46,7 @@ def ecRecover
         match ECDSARECOVER h ⟨#[.ofNat v' - 27]⟩ r s with
           | .ok s =>
               ffi.ByteArray.zeroes 12 ++ (ffi.KEC s).extract 12 32
-          | .error e =>
+          | .error _ =>
             .empty
     (true, accounts, gas - .ofNat requiredGas, substate, o)
 
@@ -69,7 +69,7 @@ def sha256
     let o :=
       match ffi.SHA256 env.calldata with
         | .ok s => s
-        | .error e =>
+        | .error _ =>
           .empty
     (true, accounts, gas - .ofNat requiredGas, substate, o)
 
@@ -92,7 +92,7 @@ def ripemd160
     let o :=
       match RIP160 env.calldata with
         | .ok s => s
-        | .error e =>
+        | .error _ =>
           .empty
     (true, accounts, gas - .ofNat requiredGas, substate, o)
 
@@ -210,7 +210,7 @@ def ecAdd
     let o := BN_ADD x.1 x.2 y.1 y.2
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
-      | .error e =>
+      | .error _ =>
         -- (accounts, gas - requiredGas, substate, .empty)
         (false, ∅, 0, substate, .empty)
 
@@ -233,7 +233,7 @@ def ecMul
     let o := BN_MUL x.1 x.2 n
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
-      | .error e =>
+      | .error _ =>
         -- (accounts, gas - requiredGas, substate, .empty)
         (false, ∅, 0, substate, .empty)
 
@@ -255,7 +255,7 @@ def ecPairing
     let o := SNARKV d
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
-      | .error e =>
+      | .error _ =>
         (false, ∅, 0, substate, .empty)
 
 def blake2f
@@ -275,7 +275,7 @@ def blake2f
     let o := ffi.BLAKE2 d
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
-      | .error e =>
+      | .error _ =>
         (false, ∅, 0, substate, .empty)
 
 def pointEvaluation
@@ -295,7 +295,7 @@ def pointEvaluation
     let o := PointEval d
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
-      | .error e =>
+      | .error _ =>
         (false, ∅, 0, substate, .empty)
 
 end Evm.Precompiles

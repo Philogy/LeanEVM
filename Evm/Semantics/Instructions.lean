@@ -17,7 +17,6 @@ import Evm.Crypto.Keccak256
 --
 
 import Mathlib.Data.BitVec
-import Mathlib.Data.Array.Defs
 import Mathlib.Data.Finmap
 import Mathlib.Data.List.Defs
 import Evm.Machine.Stack

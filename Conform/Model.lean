@@ -20,34 +20,6 @@ section Model
 
 open Lean
 
-def AddrMap.keys {α : Type} [Inhabited α] (self : AddrMap α) : Multiset AccountAddress :=
-  .ofList <| self.toList.map Prod.fst
-
-private abbrev sigmaLe (lhs rhs : (_ : UInt256) × UInt256) : Prop :=
-  if lhs.1.toNat = rhs.1.toNat then lhs.2.toNat ≤ rhs.2.toNat else lhs.1.toNat ≤ rhs.1.toNat
-
-instance : LE ((_ : UInt256) × UInt256) := ⟨sigmaLe⟩
-
-instance : DecidableRel (α := (_ : UInt256) × UInt256) (· ≤ ·) :=
-  λ a b ↦ inferInstanceAs (Decidable (sigmaLe a b))
-
-instance : IsTrans ((_ : UInt256) × UInt256) (· ≤ ·) where
-  trans a b c h₁ h₂ := by
-    simp only [LE.le, sigmaLe] at *
-    grind
-
-instance : IsAntisymm ((_ : UInt256) × UInt256) (· ≤ ·) where
-  antisymm a b h₁ h₂ := by
-    obtain ⟨a₁, a₂⟩ := a
-    obtain ⟨b₁, b₂⟩ := b
-    simp only [LE.le, sigmaLe] at h₁ h₂
-    grind [Evm.UInt256.toNat_inj]
-
-instance : IsTotal ((_ : UInt256) × UInt256) (· ≤ ·) where
-  total a b := by
-    simp only [LE.le, sigmaLe]
-    grind
-
 abbrev Code := ByteArray
 
 abbrev Pre := PersistentAccountMap
