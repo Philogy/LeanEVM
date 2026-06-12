@@ -14,8 +14,6 @@ import Evm.Machine.ExecutionState
 import Evm.Machine.ExecutionStateOps
 import Evm.Machine.MachineState
 import Evm.Machine.MachineStateOps
-import Evm.Machine.SharedState
-import Evm.Machine.SharedStateOps
 import Evm.Machine.Stack
 import Evm.Maps.AccountMap
 import Evm.Maps.ByteMap

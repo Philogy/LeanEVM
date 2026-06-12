@@ -68,19 +68,19 @@ def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
       let exec ← chargeMemExpansion exec mstart.toNat size.toNat
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
-        { exec with toSharedState := exec.toSharedState.calldatacopy mstart dstart size } stack
+        (exec.calldatacopy mstart dstart size) stack
     | .CODECOPY => do
       let (stack, mstart, cstart, size) ← exec.stack.pop3
       let exec ← chargeMemExpansion exec mstart.toNat size.toNat
       let exec ← charge (Gverylow + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
-        { exec with toSharedState := exec.toSharedState.codeCopy mstart cstart size } stack
+        (exec.codeCopy mstart cstart size) stack
     | .EXTCODECOPY => do
       let (stack, addr, mstart, cstart, size) ← exec.stack.pop4
       let exec ← chargeMemExpansion exec mstart.toNat size.toNat
       let exec ← charge (accessCost (AccountAddress.ofUInt256 addr) exec.substate + copyCost size) exec
       continueWith <| ExecutionState.replaceStackAndIncrPC
-        { exec with toSharedState := exec.toSharedState.extCodeCopy' addr mstart cstart size } stack
+        (exec.extCodeCopy' addr mstart cstart size) stack
     | .RETURNDATACOPY => do
       let (stack, mstart, rstart, size) ← exec.stack.pop3
       if rstart.toNat + size.toNat > exec.returnData.size then throw .InvalidMemoryAccess
@@ -140,15 +140,12 @@ def stepFrame (fr : Frame) : Signal :=
   else
     let δ := stackPopCount op
     let α := stackPushCount op
-    if exec.stackSize < δ then
+    let stackLen := exec.stack.size
+    if stackLen < δ then
       .halted (.exception .StackUnderflow)
-    else if exec.stackSize - δ + α > 1024 then
+    else if stackLen - δ + α > 1024 then
       .halted (.exception .StackOverflow)
     else
-      let exec :=
-        { exec with
-            execLength := exec.execLength + 1
-            stackSize := exec.stackSize - δ + α }
       match dispatch op arg fr exec with
         | .ok signal => signal
         | .error e => .halted (.exception e)

@@ -3,7 +3,6 @@ import Evm.Machine.Stack
 import Evm.Machine.ExecutionState
 import Evm.Machine.ExecutionStateOps
 import Evm.Machine.MachineStateOps
-import Evm.Machine.SharedStateOps
 import Evm.Semantics.Frame
 import Evm.Semantics.Gas
 import Evm.Semantics.GasConstants
@@ -106,7 +105,7 @@ def logArm (exec : ExecutionState) (stack : Stack UInt256) (offset size : UInt25
   requireStateMod exec
   let exec ← chargeMemExpansion exec offset.toNat size.toNat
   let exec ← charge (logCost topics.size size) exec
-  let shared' := SharedState.logOp offset size topics exec.toSharedState
-  continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toSharedState := shared' } stack
+  let exec' := exec.logOp offset size topics
+  continueWith <| exec'.replaceStackAndIncrPC stack
 
 end Evm

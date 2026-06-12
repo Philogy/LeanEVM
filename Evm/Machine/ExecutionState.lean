@@ -1,24 +1,18 @@
 import Evm.Machine.Stack
 
 import Evm.State
-import Evm.Machine.SharedState
+import Evm.Machine.MachineState
 
 namespace Evm
 
 /--
-The EVM execution state (extends Evm.SharedState).
-- `pc`         `pc`
-- `stack`      `s`
-- `stackSize`  - Cached `stack.length`, maintained by the interpreter via the
-                 per-instruction net stack effect `α − δ` (the stack checks
-                 would otherwise walk the list twice per executed instruction).
-- `execLength` - Length of execution.
+The EVM execution state (world state + machine state + control state).
+- `pc`    `pc`
+- `stack` `s`
 -/
-structure ExecutionState extends Evm.SharedState where
+structure ExecutionState extends Evm.State, Evm.MachineState where
   pc    : UInt256
   stack : Stack UInt256
-  stackSize : ℕ
-  execLength : ℕ
   deriving Inhabited
 
 end Evm
