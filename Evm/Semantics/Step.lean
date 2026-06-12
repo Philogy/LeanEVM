@@ -38,7 +38,7 @@ private def Z (validJumps : Array UInt256) (w : Operation) (evmState : Execution
   -- memoryExpansionCost and C' peek at stack slots with `!`.
   if δ w = none then
     .error .InvalidInstruction
-  if evmState.stack.length < (δ w).getD 0 then
+  if evmState.stackSize < (δ w).getD 0 then
     .error .StackUnderflow
   let cost₁ := memoryExpansionCost evmState w
   if evmState.gasAvailable.toNat < cost₁ then
@@ -61,7 +61,7 @@ private def Z (validJumps : Array UInt256) (w : Operation) (evmState : Execution
   if w = .RETURNDATACOPY ∧ (evmState.stack.getD 1 0).toNat + (evmState.stack.getD 2 0).toNat > evmState.returnData.size then
     .error .InvalidMemoryAccess
 
-  if evmState.stack.length - (δ w).getD 0 + (α w).getD 0 > 1024 then
+  if evmState.stackSize - (δ w).getD 0 + (α w).getD 0 > 1024 then
     .error .StackOverflow
 
   if (¬ evmState.executionEnv.perm) ∧ W w evmState.stack then
@@ -217,22 +217,28 @@ recursing; everything else is `stepPrimop`.
 -/
 private def execInstr (fr : Frame) (instr : Operation) (arg : Option (UInt256 × Nat))
     (gasCost : ℕ) : Except ExecutionException StepOutcome := do
-  let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
   match instr with
     | .CREATE =>
-      let evmState := { evmState with gasAvailable := evmState.gasAvailable - UInt256.ofNat gasCost }
+      let evmState :=
+        { fr.exec with
+            execLength := fr.exec.execLength + 1
+            gasAvailable := fr.exec.gasAvailable - UInt256.ofNat gasCost }
       match evmState.stack.pop3 with
         | some ⟨stack, μ₀, μ₁, μ₂⟩ =>
           prepareCreate fr evmState stack μ₀ μ₁ μ₂ none
         | _ => .error .StackUnderflow
     | .CREATE2 =>
       -- Exactly equivalent to CREATE except ζ ≡ μₛ[3]
-      let evmState := { evmState with gasAvailable := evmState.gasAvailable - UInt256.ofNat gasCost }
+      let evmState :=
+        { fr.exec with
+            execLength := fr.exec.execLength + 1
+            gasAvailable := fr.exec.gasAvailable - UInt256.ofNat gasCost }
       match evmState.stack.pop4 with
         | some ⟨stack, μ₀, μ₁, μ₂, μ₃⟩ =>
           prepareCreate fr evmState stack μ₀ μ₁ μ₂ (some <| Evm.UInt256.toByteArray μ₃)
         | _ => .error .StackUnderflow
     | .CALL => do
+      let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       -- Names are from the YP, these are:
       -- μ₀ - gas, μ₁ - to, μ₂ - value, μ₃ - inOffset, μ₄ - inSize, μ₅ - outOffset, μ₆ - outSize
       let (stack, μ₀, μ₁, μ₂, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop7
@@ -240,24 +246,30 @@ private def execInstr (fr : Frame) (instr : Operation) (arg : Option (UInt256 ×
         μ₀ (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
         evmState.executionEnv.perm
     | .CALLCODE => do
+      let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₂, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop7
       return prepareCall fr evmState gasCost stack
         μ₀ (.ofNat evmState.executionEnv.codeOwner) (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
         evmState.executionEnv.perm
     | .DELEGATECALL => do
       -- No `value` argument: the parent's value and caller are inherited.
+      let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop6
       return prepareCall fr evmState gasCost stack
         μ₀ (.ofNat evmState.executionEnv.source) (.ofNat evmState.executionEnv.codeOwner) μ₁ 0 evmState.executionEnv.weiValue μ₃ μ₄ μ₅ μ₆
         evmState.executionEnv.perm
     | .STATICCALL => do
       -- No `value` argument; the child runs with state modification forbidden.
+      let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop6
       return prepareCall fr evmState gasCost stack
         μ₀ (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₁ 0 0 μ₃ μ₄ μ₅ μ₆
         false
     | instr =>
-      let exec' ← stepPrimop instr arg { evmState with gasAvailable := evmState.gasAvailable - UInt256.ofNat gasCost }
+      let exec' ← stepPrimop instr arg
+        { fr.exec with
+            execLength := fr.exec.execLength + 1
+            gasAvailable := fr.exec.gasAvailable - UInt256.ofNat gasCost }
       return .next exec'
 
 /--
@@ -271,9 +283,14 @@ def stepFrame (fr : Frame) : StepOutcome :=
   match Z fr.validJumps w evmState with
     | .error e => .halt (.exception e)
     | .ok (evmState, cost₂) =>
+      -- Every instruction's net stack effect is exactly `α − δ` (the
+      -- StackOverflow check above is predicated on this), so the cached
+      -- stack size can be maintained without walking the stack.
+      let stackSize' := evmState.stackSize - (δ w).getD 0 + (α w).getD 0
       match execInstr { fr with exec := evmState } w arg cost₂ with
         | .error e => .halt (.exception e)
         | .ok (.next exec') =>
+          let exec' := { exec' with stackSize := stackSize' }
           match H exec'.toMachineState w with
             | none => .next exec'
             | some o =>
@@ -287,6 +304,14 @@ def stepFrame (fr : Frame) : StepOutcome :=
                 .halt (.revert exec'.gasAvailable o)
               else
                 .halt (.success exec' o)
+        | .ok (.needsCall params pending) =>
+          -- The suspended frame resumes with the popped stack plus the pushed
+          -- success flag — its length is the predicted `α − δ` net effect.
+          .needsCall params
+            { pending with frame.exec.stackSize := stackSize' }
+        | .ok (.needsCreate params pending) =>
+          .needsCreate params
+            { pending with frame.exec.stackSize := stackSize' }
         | .ok outcome => outcome
 
 end Evm

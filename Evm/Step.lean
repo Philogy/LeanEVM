@@ -57,11 +57,9 @@ open Stack
 
 def dup (n : ℕ) : Transformer :=
   λ s ↦
-  let top := s.stack.take n
-  if top.length = n then
-    .ok <| s.replaceStackAndIncrPC (top.getLast! :: s.stack)
-  else
-    .error .StackUnderflow
+  match s.stack[n-1]? with
+    | some v => .ok <| s.replaceStackAndIncrPC (v :: s.stack)
+    | none => .error .StackUnderflow
 
 def swap (n : ℕ) : Transformer :=
   λ s ↦

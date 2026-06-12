@@ -22,7 +22,7 @@ def Υ
   (blocks : ProcessedBlocks)
   (T : Transaction)
   (S_T : AccountAddress)
-  : Except Exception (AccountMap × Substate × Bool × UInt256)
+  : Except Exception TransactionResult
 := do
   let g₀ : ℕ := intrinsicGas T
   -- "here can be no invalid transactions from this point"
@@ -135,6 +135,6 @@ def Υ
   let deadAccounts := A.touchedAccounts.filter (Evm.State.dead σStar' ·)
   let σ' := deadAccounts.foldl Batteries.RBMap.erase σ' -- (88)
   let σ' := σ'.map λ (addr, acc) ↦ (addr, { acc with tstorage := .empty})
-  .ok (σ', A, z, T.base.gasLimit - gStar)
+  .ok { accounts := σ', substate := A, success := z, gasUsed := T.base.gasLimit - gStar }
 
 end Evm

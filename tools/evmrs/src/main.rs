@@ -36,8 +36,9 @@ fn main() {
         "snarkv" => snarkv(&args[2..]),
         "point-eval" => point_eval(&args[2..]),
         "trie-root" => trie_root(&args[2..]),
+        "state-root" => state_root(&args[2..]),
         _ => {
-            eprintln!("usage: evmrs <rip160|recover|bn-add|bn-mul|snarkv|point-eval|trie-root> ...");
+            eprintln!("usage: evmrs <rip160|recover|bn-add|bn-mul|snarkv|point-eval|trie-root|state-root> ...");
             std::process::exit(2);
         }
     }
@@ -253,10 +254,27 @@ fn point_eval(args: &[String]) {
     ));
 }
 
+/// Merkle-Patricia trie root of (key, value) leaf pairs, with the python
+/// `trie_set` semantics: later writes win, empty values are absent.
+fn mpt_root(mut pairs: Vec<(Vec<u8>, Vec<u8>)>) -> [u8; 32] {
+    use alloy_trie::{HashBuilder, Nibbles};
+    // Later writes win (python trie_set overwrites), then sort by key as
+    // HashBuilder requires strictly increasing insertion order.
+    pairs.reverse();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    pairs.dedup_by(|a, b| a.0 == b.0);
+    let mut hb = HashBuilder::default();
+    for (k, v) in &pairs {
+        if !v.is_empty() {
+            hb.add_leaf(Nibbles::unpack(k), v);
+        }
+    }
+    hb.root().0
+}
+
 /// `trie-root <input-file> <n>` — input file holds `n` (key, value) pairs as
 /// alternating hex lines; computes the unsecured Merkle-Patricia trie root.
 fn trie_root(args: &[String]) {
-    use alloy_trie::{HashBuilder, Nibbles};
     if args.len() != 2 {
         err();
     }
@@ -269,17 +287,86 @@ fn trie_root(args: &[String]) {
         let v = unhex(lines.next().unwrap_or_else(|| err()));
         pairs.push((k, v));
     }
-    // Later writes win (python trie_set overwrites), then sort by key as
-    // HashBuilder requires strictly increasing insertion order.
-    pairs.reverse();
-    pairs.sort_by(|a, b| a.0.cmp(&b.0));
-    pairs.dedup_by(|a, b| a.0 == b.0);
-    let mut hb = HashBuilder::default();
-    for (k, v) in &pairs {
-        if !v.is_empty() {
-            hb.add_leaf(Nibbles::unpack(k), v);
-        }
+    out(&hex::encode(mpt_root(pairs)));
+}
+
+/// RLP encoding of a byte string, appended to `out`.
+fn rlp_str(b: &[u8], out: &mut Vec<u8>) {
+    if b.len() == 1 && b[0] < 0x80 {
+        out.push(b[0]);
+    } else if b.len() <= 55 {
+        out.push(0x80 + b.len() as u8);
+        out.extend_from_slice(b);
+    } else {
+        let lb = b.len().to_be_bytes();
+        let lb = &lb[lb.iter().position(|&x| x != 0).unwrap()..];
+        out.push(0xb7 + lb.len() as u8);
+        out.extend_from_slice(lb);
+        out.extend_from_slice(b);
     }
-    let root = hb.root();
-    out(&hex::encode(root.as_slice()));
+}
+
+/// RLP list header for an already-encoded payload, prepended into a fresh buffer.
+fn rlp_list(payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(payload.len() + 4);
+    if payload.len() <= 55 {
+        out.push(0xc0 + payload.len() as u8);
+    } else {
+        let lb = payload.len().to_be_bytes();
+        let lb = &lb[lb.iter().position(|&x| x != 0).unwrap()..];
+        out.push(0xf7 + lb.len() as u8);
+        out.extend_from_slice(lb);
+    }
+    out.extend_from_slice(payload);
+    out
+}
+
+/// `state-root <input-file>` — computes the secured state trie root over whole
+/// accounts in ONE process (the per-account storage roots and the account RLP
+/// leaves included), replacing one `trie-root` spawn per contract account.
+///
+/// Input file, all values bare hex, one per line:
+/// ```text
+/// A                     -- number of accounts
+/// then A times:
+///   keccak(address)     -- 32 bytes
+///   nonce               -- minimal big-endian (empty line for 0)
+///   balance             -- minimal big-endian
+///   keccak(code)        -- 32 bytes
+///   S                   -- number of storage entries
+///   then S times:
+///     keccak(slot)      -- 32 bytes
+///     rlp(value)        -- RLP of the minimal big-endian value
+/// ```
+fn state_root(args: &[String]) {
+    if args.len() != 1 {
+        err();
+    }
+    let content = std::fs::read_to_string(&args[0]).unwrap_or_else(|_| err());
+    let mut lines = content.lines();
+    let mut next = || lines.next().unwrap_or_else(|| err());
+    let n_accounts: usize = next().trim().parse().unwrap_or_else(|_| err());
+    let mut state_pairs: Vec<(Vec<u8>, Vec<u8>)> = Vec::with_capacity(n_accounts);
+    for _ in 0..n_accounts {
+        let addr_hash = unhex(next());
+        let nonce = unhex(next());
+        let balance = unhex(next());
+        let code_hash = unhex(next());
+        let n_storage: usize = next().trim().parse().unwrap_or_else(|_| err());
+        let mut storage_pairs: Vec<(Vec<u8>, Vec<u8>)> = Vec::with_capacity(n_storage);
+        for _ in 0..n_storage {
+            let k = unhex(next());
+            let v = unhex(next());
+            storage_pairs.push((k, v));
+        }
+        let storage_root = mpt_root(storage_pairs);
+        // rlp([nonce, balance, storageRoot, codeHash])
+        let mut payload = Vec::with_capacity(128);
+        rlp_str(&nonce, &mut payload);
+        rlp_str(&balance, &mut payload);
+        rlp_str(&storage_root, &mut payload);
+        rlp_str(&code_hash, &mut payload);
+        state_pairs.push((addr_hash, rlp_list(&payload)));
+    }
+    out(&hex::encode(mpt_root(state_pairs)));
 }

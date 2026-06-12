@@ -82,4 +82,14 @@ on revert it carries the revert data.
 structure CreateResult extends CallResult where
   address : AccountAddress
 
+/--
+Result of executing one transaction — the YP's `Υ` return tuple
+`(σ′, A, z, gasUsed)` as a named record.
+-/
+structure TransactionResult where
+  accounts : AccountMap
+  substate : Substate
+  success  : Bool
+  gasUsed  : UInt256
+
 end Evm

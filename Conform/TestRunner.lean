@@ -118,7 +118,7 @@ def executeTransaction
   (header : BlockHeader)
   : Except Evm.Exception ExecutionState
 := do
-  let (ypState, substate, statusCode, totalGasUsed) ←
+  let { accounts := ypState, substate, success := statusCode, gasUsed := totalGasUsed } ←
     Υ
       s.accountMap
       header.baseFeePerGas

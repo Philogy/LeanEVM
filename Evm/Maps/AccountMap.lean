@@ -91,14 +91,27 @@ def L_S (σ : PersistentAccountMap) : Array (ByteArray × ByteArray) :=
           , .𝔹 acc.codeHash.toByteArray
           ]
 
+/--
+The secured state trie root. The whole computation (per-account storage
+roots, account RLP, state trie) happens in a single `evmrs state-root`
+invocation — one process per root, not one per contract account.
+-/
 def stateTrieRoot (σ : PersistentAccountMap) : Option ByteArray :=
-  let a := Array.map toBlobPair (L_S σ)
-  (ByteArray.ofBlob (blobComputeTrieRoot a)).toOption
- where
-  toBlobPair entry : String × String :=
-    let b₁ := Evm.toHex entry.1
-    let b₂ := Evm.toHex entry.2
-    (b₁, b₂)
+  let payload :=
+    σ.foldl (init := s!"{σ.size}\n") λ acc addr account ↦
+      let storage := account.storage.1.toArray
+      let storageLines :=
+        storage.foldl (init := s!"{storage.size}\n") λ acc (slot, value) ↦
+          acc
+            ++ Evm.toHex (ffi.KEC slot.toByteArray) ++ "\n"
+            ++ Evm.toHex ((RLP (.𝔹 (BE value.toNat))).get!) ++ "\n"
+      acc
+        ++ Evm.toHex (ffi.KEC addr.toByteArray) ++ "\n"
+        ++ Evm.toHex (BE account.nonce.toNat) ++ "\n"
+        ++ Evm.toHex (BE account.balance.toNat) ++ "\n"
+        ++ Evm.toHex account.codeHash.toByteArray ++ "\n"
+        ++ storageLines
+  (ByteArray.ofBlob (blobComputeStateRoot payload)).toOption
 
 end RemoveLater
 

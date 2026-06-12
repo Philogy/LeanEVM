@@ -17,7 +17,7 @@ def incrPC (I : ExecutionState) (pcΔ : ℕ := 1) : ExecutionState :=
   { I with pc := I.pc + .ofNat pcΔ }
 
 def replaceStackAndIncrPC (I : ExecutionState) (s : Stack UInt256) (pcΔ : ℕ := 1) : ExecutionState :=
-  incrPC { I with stack := s } pcΔ
+  { I with stack := s, pc := I.pc + .ofNat pcΔ }
 
 end Instructions
 
