@@ -31,7 +31,7 @@ def Ξ_ECREC
   let gᵣ : ℕ := 3000
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let d := I.calldata
     let h := d.readBytes 0 32
@@ -47,7 +47,7 @@ def Ξ_ECREC
       else
         match ECDSARECOVER h ⟨#[.ofNat v' - 27]⟩ r s with
           | .ok s =>
-              ffi.ByteArray.zeroes ⟨12⟩ ++ (ffi.KEC s).extract 12 32
+              ffi.ByteArray.zeroes 12 ++ (ffi.KEC s).extract 12 32
           | .error e =>
             dbg_trace s!"Ξ_ECREC failed: {e}"
             .empty
@@ -67,7 +67,7 @@ def Ξ_SHA256
     60 + 12 * ceil
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o :=
       match ffi.SHA256 I.calldata with
@@ -91,7 +91,7 @@ def Ξ_RIP160
     600 + 120 * ceil
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o :=
       match RIP160 I.calldata with
@@ -115,7 +115,7 @@ def Ξ_ID
     15 + 3 * ceil
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o := I.calldata
     (true, σ, g - .ofNat gᵣ, A, o)
@@ -178,7 +178,7 @@ def Ξ_EXPMOD
     max 200 (multiplication_complexity base_length modulus_length * iterations / G_quaddivisor)
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let modulus := nat_of_slice data (96 + base_length + exp_length) modulus_length
     let o : ByteArray :=
@@ -200,16 +200,16 @@ private def expmodOutput :=
   let (_, _, _, _, o) :=
     Ξ_EXPMOD
       default
-      ⟨3000⟩
+      3000
       default
       { (default : ExecutionEnv .EVM) with
         calldata := l_B ++ l_E ++ l_M ++ B ++ E ++ M
       }
   o
  where
-  l_B : ByteArray := UInt256.toByteArray ⟨2⟩
-  l_E : ByteArray := UInt256.toByteArray ⟨1⟩
-  l_M : ByteArray := UInt256.toByteArray ⟨1⟩
+  l_B : ByteArray := UInt256.toByteArray 2
+  l_E : ByteArray := UInt256.toByteArray 1
+  l_M : ByteArray := UInt256.toByteArray 1
   B : ByteArray := ⟨#[1, 0]⟩ -- 2^8
   E : ByteArray := ⟨#[2]⟩
   M : ByteArray := ⟨#[100]⟩
@@ -225,7 +225,7 @@ def Ξ_BN_ADD
   let gᵣ : ℕ := 150
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let d := I.calldata
     let x := (d.readBytes 0 32, d.readBytes 32 32)
@@ -236,37 +236,37 @@ def Ξ_BN_ADD
       | .error e =>
         dbg_trace s!"Ξ_BN_ADD failed: {e}"
         -- (σ, g - gᵣ, A, .empty)
-        (false, ∅, ⟨0⟩, A, .empty)
+        (false, ∅, 0, A, .empty)
 
 private def bn_addOutput₀ :=
   let (_, _, _, _, o) :=
     Ξ_BN_ADD
       default
-      ⟨3000⟩
+      3000
       default
       { (default : ExecutionEnv .EVM) with
         calldata := x₁ ++ y₁ ++ x₂ ++ y₂
       }
   o
  where
-  x₁ : ByteArray := UInt256.toByteArray ⟨0⟩
-  y₁ : ByteArray := UInt256.toByteArray ⟨0⟩
-  x₂ : ByteArray := UInt256.toByteArray ⟨1⟩
-  y₂ : ByteArray := UInt256.toByteArray ⟨2⟩
+  x₁ : ByteArray := UInt256.toByteArray 0
+  y₁ : ByteArray := UInt256.toByteArray 0
+  x₂ : ByteArray := UInt256.toByteArray 1
+  y₂ : ByteArray := UInt256.toByteArray 2
 
 private def bn_addOutput₁ :=
   let (_, _, _, _, o) :=
     Ξ_BN_ADD
       default
-      ⟨3000⟩
+      3000
       default
       { (default : ExecutionEnv .EVM) with
         calldata := bn_addOutput₀ ++ x ++ y
       }
   o
  where
-  x : ByteArray := UInt256.toByteArray ⟨1⟩
-  y : ByteArray := UInt256.toByteArray ⟨2⟩
+  x : ByteArray := UInt256.toByteArray 1
+  y : ByteArray := UInt256.toByteArray 2
 
 def Ξ_BN_MUL
   (σ : AccountMap .EVM)
@@ -279,7 +279,7 @@ def Ξ_BN_MUL
   let gᵣ : ℕ := 6000
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let d := I.calldata
     let x := (d.readBytes 0 32, d.readBytes 32 32)
@@ -290,22 +290,22 @@ def Ξ_BN_MUL
       | .error e =>
         dbg_trace s!"Ξ_BN_MUL failed: {e}"
         -- (σ, g - gᵣ, A, .empty)
-        (false, ∅, ⟨0⟩, A, .empty)
+        (false, ∅, 0, A, .empty)
 
 private def bn_mulOutput :=
   let (_, _, _, _, o) :=
     Ξ_BN_MUL
       default
-      ⟨100000⟩
+      100000
       default
       { (default : ExecutionEnv .EVM) with
         calldata := x₁ ++ y₁ ++ n
       }
   o
  where
-  x₁ : ByteArray := UInt256.toByteArray ⟨1⟩
-  y₁ : ByteArray := UInt256.toByteArray ⟨2⟩
-  n  : ByteArray := UInt256.toByteArray ⟨2⟩
+  x₁ : ByteArray := UInt256.toByteArray 1
+  y₁ : ByteArray := UInt256.toByteArray 2
+  n  : ByteArray := UInt256.toByteArray 2
 
 def Ξ_SNARKV
   (σ : AccountMap .EVM)
@@ -320,28 +320,28 @@ def Ξ_SNARKV
   let gᵣ : ℕ := 34000 * k + 45000
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o := SNARKV d
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
         dbg_trace s!"Ξ_SNARKV failed: {e}"
-        (false, ∅, ⟨0⟩, A, .empty)
+        (false, ∅, 0, A, .empty)
 
 private def snarkvOutput :=
   let (_, _, _, _, o) :=
     Ξ_SNARKV
       default
-      ⟨100000⟩
+      100000
       default
       { (default : ExecutionEnv .EVM) with
         calldata := x ++ y ++ ffi.ByteArray.zeroes ⟨32 * 4⟩
       }
   o
  where
-  x : ByteArray := UInt256.toByteArray ⟨1⟩
-  y : ByteArray := UInt256.toByteArray ⟨2⟩
+  x : ByteArray := UInt256.toByteArray 1
+  y : ByteArray := UInt256.toByteArray 2
 
 def Ξ_BLAKE2_F
   (σ : AccountMap .EVM)
@@ -356,14 +356,14 @@ def Ξ_BLAKE2_F
 
   if g.toNat < gᵣ then
     dbg_trace "failed"
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o := ffi.BLAKE2 d
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
         dbg_trace s!"Ξ_BLAKE2_F failed: {e}"
-        (false, ∅, ⟨0⟩, A, .empty)
+        (false, ∅, 0, A, .empty)
 
 def Ξ_PointEval
   (σ : AccountMap .EVM)
@@ -377,11 +377,11 @@ def Ξ_PointEval
   let gᵣ : ℕ := 50000
 
   if g.toNat < gᵣ then
-    (false, ∅, ⟨0⟩, A, .empty)
+    (false, ∅, 0, A, .empty)
   else
     let o := PointEval d
     match o with
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
         dbg_trace s!"Ξ_PointEval failed: {e}"
-        (false, ∅, ⟨0⟩, A, .empty)
+        (false, ∅, 0, A, .empty)

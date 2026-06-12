@@ -101,9 +101,9 @@ def Csstore (s : EVM.State) : ℕ :=
   let storeAddr := μₛ[0]!
   let v₀ :=
     match σ₀.find? Iₐ with
-      | none => ⟨0⟩
-      | some acc => acc.storage.findD storeAddr ⟨0⟩
-  let v := σ_Iₐ.findD storeAddr ⟨0⟩
+      | none => 0
+      | some acc => acc.storage.findD storeAddr 0
+  let v := σ_Iₐ.findD storeAddr 0
   let v' := μₛ[1]!
   let loadComponent :=
     if s.substate.accessedStorageKeys.contains (Iₐ, storeAddr) then
@@ -111,7 +111,7 @@ def Csstore (s : EVM.State) : ℕ :=
     else
       Gcoldsload
   let storeComponent := if v = v' || v₀ ≠ v             then Gwarmaccess else
-                        if v ≠ v' && v₀ = v && v₀ = ⟨0⟩ then Gsset else
+                        if v ≠ v' && v₀ = v && v₀ = 0 then Gsset else
                         /- v ≠ v' ∧ v₀ = v ∧ v₀ ≠ 0 -/     Gsreset
   loadComponent + storeComponent
 
@@ -140,7 +140,7 @@ def Cselfdestruct (s : EVM.State) : ℕ :=
   let { substate.accessedAccounts := Aₐ, accountMap := σ, executionEnv.codeOwner := Iₐ, .. } := s
   let c_cold := if Aₐ.contains r then 0 else Gcoldaccountaccess
   let c_new :=
-    if State.dead σ r ∧ (σ.find? Iₐ |>.option ⟨0⟩ (·.balance)) ≠ ⟨0⟩ then
+    if State.dead σ r ∧ (σ.find? Iₐ |>.option 0 (·.balance)) ≠ 0 then
       Gnewaccount
     else 0
   Gselfdestruct + c_cold + c_new
@@ -162,10 +162,10 @@ def Ctload : ℕ :=
 def L (n : ℕ) : ℕ := n - (n / 64)
 
 def Cnew (t : AccountAddress) (val : UInt256) (σ : AccountMap .EVM) : ℕ :=
-  if EvmYul.State.dead σ t && val != ⟨0⟩ then Gnewaccount else 0
+  if EvmYul.State.dead σ t && val != 0 then Gnewaccount else 0
 
 def Cxfer (val : UInt256) : ℕ :=
-  if val != ⟨0⟩ then Gcallvalue else 0
+  if val != 0 then Gcallvalue else 0
 
 def Cextra (t r : AccountAddress) (val : UInt256) (σ : AccountMap .EVM) (A : Substate) : ℕ :=
   Caccess t A + Cxfer val + Cnew r val σ
@@ -178,7 +178,7 @@ def Cgascap (t r : AccountAddress) (val g : UInt256) (σ : AccountMap .EVM) (μ 
 
 def Ccallgas (t r : AccountAddress) (val g : UInt256) (σ : AccountMap .EVM) (μ : MachineState) (A : Substate) : ℕ :=
   match val with
-    | ⟨0⟩ => Cgascap t r val g σ μ A
+    | 0 => Cgascap t r val g σ μ A
     | _ => Cgascap t r val g σ μ A + GasConstants.Gcallstipend
 
 /--
@@ -226,7 +226,7 @@ def C' (s : State) (instr : Operation .EVM) : ℕ :=
   match instr with
     | .SSTORE => Csstore s
     | .TSTORE => Ctstore
-    | .EXP => let μ₁ := μₛ[1]!; if μ₁ == ⟨0⟩ then Gexp else Gexp + Gexpbyte * (1 + Nat.log 256 μ₁.toNat) -- TODO(check) I think this floors by itself. cf. H.1. YP.
+    | .EXP => let μ₁ := μₛ[1]!; if μ₁ == 0 then Gexp else Gexp + Gexpbyte * (1 + Nat.log 256 μ₁.toNat) -- TODO(check) I think this floors by itself. cf. H.1. YP.
     | .EXTCODECOPY => Caccess (AccountAddress.ofUInt256 μₛ[0]!) A + Gcopy * ((μₛ[3]!.toNat + 31) / 32)
     | .LOG0 => Glog + Glogdata * μₛ[1]!.toNat
     | .LOG1 => Glog + Glogdata * μₛ[1]!.toNat +     Glogtopic
@@ -248,8 +248,8 @@ def C' (s : State) (instr : Operation .EVM) : ℕ :=
     -/
     | .CALL =>         Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!) μₛ[2]! μₛ[0]! σ μ A
     | .CALLCODE =>     Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner μₛ[2]! μₛ[0]! σ μ A
-    | .DELEGATECALL => Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    ⟨0⟩ μₛ[0]! σ μ A
-    | .STATICCALL =>   Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    ⟨0⟩ μₛ[0]! σ μ A
+    | .DELEGATECALL => Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    0 μₛ[0]! σ μ A
+    | .STATICCALL =>   Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    0 μₛ[0]! σ μ A
     | .BLOBHASH => HASH_OPCODE_GAS
     -- Direct match arms for the Appendix G instruction groups (W_copy, W_extaccount,
     -- W_zero, W_base, W_verylow, W_low, W_mid, W_high). Previously linear `List.elem`

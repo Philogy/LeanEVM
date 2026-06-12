@@ -33,10 +33,10 @@ section RemoveLater
 abbrev Storage : Type := Batteries.RBMap UInt256 UInt256 compare
 
 def Storage.toFinmap (self : Storage) : Finmap (λ _ : UInt256 ↦ UInt256) :=
-  self.foldl (init := ∅) λ acc k v ↦ acc.insert (UInt256.ofNat k.1) v
+  self.foldl (init := ∅) λ acc k v ↦ acc.insert k v
 
 def Storage.toEvmYulStorage (self : Storage) : EvmYul.Storage :=
-  self.foldl (init := ∅) λ acc k v ↦ acc.insert (UInt256.ofNat k.1) v
+  self.foldl (init := ∅) λ acc k v ↦ acc.insert k v
 
 def toBlobs (pair : UInt256 × UInt256) : Option (String × String) := do
   let kec := ffi.KEC pair.1.toByteArray

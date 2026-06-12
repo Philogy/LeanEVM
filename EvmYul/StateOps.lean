@@ -46,7 +46,7 @@ def updateSelfAccount! {τ} (self : State τ) : (Account τ → Account τ) → 
 
 def balance {τ} (self : State τ) (k : UInt256) : State τ × UInt256 :=
   let addr := AccountAddress.ofUInt256 k
-  (self.addAccessedAccount addr, self.accountMap.find? addr |>.elim ⟨0⟩ (·.balance))
+  (self.addAccessedAccount addr, self.accountMap.find? addr |>.elim 0 (·.balance))
 
 def initialiseAccount (addr : AccountAddress) (self : State .EVM) : State .EVM :=
   if self.accountExists addr then self else self.updateAccount addr default
@@ -67,14 +67,14 @@ section CodeCopy
 
 def extCodeSize (self : State .EVM) (a : UInt256) : State .EVM × UInt256 :=
   let addr := AccountAddress.ofUInt256 a
-  let s := self.lookupAccount addr |>.option ⟨0⟩ (.ofNat ∘ ByteArray.size ∘ (·.code))
+  let s := self.lookupAccount addr |>.option 0 (.ofNat ∘ ByteArray.size ∘ (·.code))
   (self.addAccessedAccount addr, s)
 
 def extCodeHash (self : State .EVM) (v : UInt256) : State .EVM × UInt256 :=
   let addr := AccountAddress.ofUInt256 v
   let newState := self.addAccessedAccount addr
-  if dead self.accountMap addr then (newState, ⟨0⟩) else
-  let r := self.lookupAccount (AccountAddress.ofUInt256 v) |>.option ⟨0⟩ Account.codeHash
+  if dead self.accountMap addr then (newState, 0) else
+  let r := self.lookupAccount (AccountAddress.ofUInt256 v) |>.option 0 Account.codeHash
   (newState, r)
 
 end CodeCopy
@@ -83,10 +83,10 @@ section Blocks
 
 def blockHash {τ} (self : State τ) (blockNumber : UInt256) : UInt256 :=
   let v := self.executionEnv.header.number
-  if v ≤ blockNumber.toNat || blockNumber.toNat + 256 < v then ⟨0⟩
+  if v ≤ blockNumber.toNat || blockNumber.toNat + 256 < v then 0
   else
     let hashes := self.blockHashes
-    hashes.getD blockNumber.toNat ⟨0⟩
+    hashes.getD blockNumber.toNat 0
 
 def coinBase {τ} (self : State τ) : AccountAddress :=
   self.executionEnv.header.beneficiary
@@ -106,7 +106,7 @@ def gasLimit {τ} (self : State τ) : UInt256 :=
 def chainId {τ} (_ : State τ) : UInt256 := .ofNat EvmYul.chainId
 
 def selfbalance {τ} (self : State τ) : UInt256 :=
-  Batteries.RBMap.find? self.accountMap self.executionEnv.codeOwner |>.elim ⟨0⟩ (·.balance)
+  Batteries.RBMap.find? self.accountMap self.executionEnv.codeOwner |>.elim 0 (·.balance)
 
 def setCode (self : State .EVM) (code : ByteArray) : State .EVM :=
   { self with executionEnv.code := code }
@@ -123,7 +123,7 @@ def setSelfStorage! {τ} (self : State τ) : Storage → State τ :=
 
 def sload {τ} (self : State τ) (spos : UInt256) : State τ × UInt256 :=
   let Iₐ := self.executionEnv.codeOwner
-  let v := self.lookupAccount Iₐ |>.option ⟨0⟩ (Account.lookupStorage (k := spos))
+  let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupStorage (k := spos))
   let state' := self.addAccessedStorageKey (Iₐ, spos)
   (state', v)
 
@@ -132,9 +132,9 @@ def sstore {τ} (self : State τ) (spos sval : UInt256) : State τ :=
   let { storage := σ_Iₐ, .. } := self.accountMap.find! Iₐ
   let v₀ :=
     match self.σ₀.find? Iₐ with
-      | none => ⟨0⟩
-      | some acc => acc.storage.findD spos ⟨0⟩
-  let v := σ_Iₐ.findD spos ⟨0⟩
+      | none => 0
+      | some acc => acc.storage.findD spos 0
+  let v := σ_Iₐ.findD spos 0
   let v' := sval
 
   let r_dirtyclear : ℤ :=
@@ -155,7 +155,7 @@ def sstore {τ} (self : State τ) (spos sval : UInt256) : State τ :=
   let newAᵣ : UInt256 :=
     match ΔAᵣ with
       | .ofNat n => self.substate.refundBalance + .ofNat n
-      | .negSucc n => self.substate.refundBalance - .ofNat n - ⟨1⟩
+      | .negSucc n => self.substate.refundBalance - .ofNat n - 1
   self.lookupAccount Iₐ |>.option self λ acc ↦
     let self' :=
       self.setAccount Iₐ (acc.updateStorage spos sval)
@@ -164,7 +164,7 @@ def sstore {τ} (self : State τ) (spos sval : UInt256) : State τ :=
 
 def tload {τ} (self : State τ) (spos : UInt256) : State τ × UInt256 :=
   let Iₐ := self.executionEnv.codeOwner
-  let v := self.lookupAccount Iₐ |>.option ⟨0⟩ (Account.lookupTransientStorage (k := spos))
+  let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupTransientStorage (k := spos))
   (self, v)
 
 def tstore {τ} (self : State τ) (spos sval : UInt256) : State τ :=

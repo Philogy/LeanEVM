@@ -31,7 +31,7 @@ instance : Inhabited AccountAddress := ⟨Fin.ofNat _ 0⟩
 namespace AccountAddress
 
 def ofNat (n : ℕ) : AccountAddress := Fin.ofNat _ n
-def ofUInt256 (v : UInt256) : AccountAddress := Fin.ofNat _ (v.val % AccountAddress.size)
+def ofUInt256 (v : UInt256) : AccountAddress := Fin.ofNat _ (v.toNat % AccountAddress.size)
 instance {n : Nat} : OfNat AccountAddress n := ⟨Fin.ofNat _ n⟩
 
 def toByteArray (a : AccountAddress) : ByteArray :=

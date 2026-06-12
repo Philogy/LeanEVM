@@ -22,37 +22,30 @@ open Lean
 def AddrMap.keys {α : Type} [Inhabited α] (self : AddrMap α) : Multiset AccountAddress :=
   .ofList <| self.toList.map Prod.fst
 
-instance : LE ((_ : UInt256) × UInt256) where
-  le lhs rhs := if lhs.1.val = rhs.1.val then lhs.2.val ≤ rhs.2.val else lhs.1.val ≤ rhs.1.val
+private abbrev sigmaLe (lhs rhs : (_ : UInt256) × UInt256) : Prop :=
+  if lhs.1.toNat = rhs.1.toNat then lhs.2.toNat ≤ rhs.2.toNat else lhs.1.toNat ≤ rhs.1.toNat
+
+instance : LE ((_ : UInt256) × UInt256) := ⟨sigmaLe⟩
+
+instance : DecidableRel (α := (_ : UInt256) × UInt256) (· ≤ ·) :=
+  λ a b ↦ inferInstanceAs (Decidable (sigmaLe a b))
 
 instance : IsTrans ((_ : UInt256) × UInt256) (· ≤ ·) where
   trans a b c h₁ h₂ := by
-    rcases a with ⟨⟨a, ha⟩, ⟨a', ha'⟩⟩
-    rcases b with ⟨⟨b, hb⟩, ⟨b', hb'⟩⟩
-    rcases c with ⟨⟨c, hc⟩, ⟨c', hc'⟩⟩
-    unfold LE.le instLESigmaUInt256_conform at h₁ h₂ ⊢; simp at *
-    aesop (config := {warnOnNonterminal := false}) <;> omega
+    simp only [LE.le, sigmaLe] at *
+    grind
 
 instance : IsAntisymm ((_ : UInt256) × UInt256) (· ≤ ·) where
   antisymm a b h₁ h₂ := by
-    rcases a with ⟨⟨a, ha⟩, ⟨a', ha'⟩⟩
-    rcases b with ⟨⟨b, hb⟩, ⟨b', hb'⟩⟩
-    unfold LE.le instLESigmaUInt256_conform at h₁ h₂; simp at *
-    aesop (config := {warnOnNonterminal := false}) <;> omega
+    obtain ⟨a₁, a₂⟩ := a
+    obtain ⟨b₁, b₂⟩ := b
+    simp only [LE.le, sigmaLe] at h₁ h₂
+    grind [EvmYul.UInt256.toNat_inj]
 
 instance : IsTotal ((_ : UInt256) × UInt256) (· ≤ ·) where
   total a b := by
-    rcases a with ⟨⟨a, ha⟩, ⟨a', ha'⟩⟩
-    rcases b with ⟨⟨b, hb⟩, ⟨b', hb'⟩⟩
-    unfold LE.le instLESigmaUInt256_conform; simp
-    aesop (config := {warnOnNonterminal := false}) <;> omega
-
-instance : DecidableRel (α := (_ : UInt256) × UInt256) (· ≤ ·) :=
-  λ a b ↦ by
-    rcases a with ⟨⟨a, ha⟩, ⟨a', ha'⟩⟩
-    rcases b with ⟨⟨b, hb⟩, ⟨b', hb'⟩⟩
-    unfold LE.le instLESigmaUInt256_conform; simp
-    aesop (config := {warnOnNonterminal := false}) <;> exact inferInstance
+    simp only [LE.le, sigmaLe]
+    grind
 
 abbrev Code := ByteArray
 

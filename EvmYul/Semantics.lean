@@ -226,7 +226,7 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
     | τ, .STOP =>
       match τ with
         | .EVM => λ evmState ↦ .ok <| {evmState with toMachineState := evmState.toMachineState.setReturnData .empty}
-        | .Yul => λ yulState _ ↦ .error (Yul.Exception.YulHalt yulState ⟨0⟩)
+        | .Yul => λ yulState _ ↦ .error (Yul.Exception.YulHalt yulState 0)
     | τ, .ADD =>
       dispatchBinary τ UInt256.add
     | τ, .MUL =>
@@ -386,7 +386,7 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
     | .Yul, .RETURN => λ yulState lits ↦ 
         match (dispatchBinaryMachineStateOp .Yul MachineState.evmReturn) yulState lits with
           | .error e => .error e
-          | .ok (s, v) => .error (Yul.Exception.YulHalt s (v.getD ⟨1⟩))
+          | .ok (s, v) => .error (Yul.Exception.YulHalt s (v.getD 1))
     | .EVM, .REVERT => dispatchBinaryMachineStateOp .EVM MachineState.evmRevert
     | .Yul, .REVERT => λ yulState lits ↦ 
         match (dispatchBinaryMachineStateOp .Yul MachineState.evmRevert) yulState lits with
@@ -414,21 +414,21 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
                   | some σ_Iₐ  =>
                     match evmState.lookupAccount r with
                       | none =>
-                        if σ_Iₐ.balance == ⟨0⟩ then
+                        if σ_Iₐ.balance == 0 then
                           evmState.accountMap
                         else
                           evmState.accountMap.insert r
                             {(default : Account .EVM) with balance := σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                       | some σ_r =>
                         if r ≠ Iₐ then
                           evmState.accountMap.insert r
                             {σ_r with balance := σ_r.balance + σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                         else
                           -- if the target is the same as the contract calling `SELFDESTRUCT` that Ether will be burnt.
-                          evmState.accountMap.insert r {σ_r with balance := ⟨0⟩}
-                            |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                          evmState.accountMap.insert r {σ_r with balance := 0}
+                            |>.insert Iₐ {σ_Iₐ with balance := 0}
               let evmState' :=
                 {evmState with
                   accountMap := accountMap'
@@ -450,17 +450,17 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
                   | some σ_Iₐ  =>
                     match evmState.lookupAccount r with
                       | none =>
-                        if σ_Iₐ.balance == ⟨0⟩ then
+                        if σ_Iₐ.balance == 0 then
                           evmState.accountMap
                         else
                           evmState.accountMap.insert r
                             {(default : Account .EVM) with balance := σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                       | some σ_r =>
                         if r ≠ Iₐ then
                           evmState.accountMap.insert r
                             {σ_r with balance := σ_r.balance + σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                         else
                           -- Note that if the target is the same as the contract
                           -- calling SELFDESTRUCT there is no net change in balances.
@@ -492,21 +492,21 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
                   | some σ_Iₐ  =>
                     match yulState.toState.lookupAccount r with
                       | none =>
-                        if σ_Iₐ.balance == ⟨0⟩ then
+                        if σ_Iₐ.balance == 0 then
                           yulState.toState.accountMap
                         else
                           yulState.toState.accountMap.insert r
                             {(default : Account .Yul) with balance := σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                       | some σ_r =>
                         if r ≠ Iₐ then
                           yulState.toState.accountMap.insert r
                             {σ_r with balance := σ_r.balance + σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                              |>.insert Iₐ {σ_Iₐ with balance := 0}
                         else
                           -- if the target is the same as the contract calling `SELFDESTRUCT` that Ether will be burnt.
-                          yulState.toState.accountMap.insert r {σ_r with balance := ⟨0⟩}
-                            |>.insert Iₐ {σ_Iₐ with balance := ⟨0⟩}
+                          yulState.toState.accountMap.insert r {σ_r with balance := 0}
+                            |>.insert Iₐ {σ_Iₐ with balance := 0}
               let yulState' :=
                 yulState.setState
                   { yulState.toState with accountMap := accountMap', substate := A'}
@@ -515,7 +515,7 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
     | τ, .INVALID => dispatchInvalid τ
     | .EVM, .Push .PUSH0 => λ evmState =>
         .ok <|
-          evmState.replaceStackAndIncrPC (evmState.stack.push ⟨0⟩)
+          evmState.replaceStackAndIncrPC (evmState.stack.push 0)
     | .EVM, .Push _ => λ evmState => do
         let some (arg, argWidth) := arg | .error .StackUnderflow
         .ok <| evmState.replaceStackAndIncrPC (evmState.stack.push arg) (pcΔ := argWidth.succ)
@@ -528,7 +528,7 @@ def step {τ : OperationType} (op : Operation τ) (arg : Option (UInt256 × Nat)
     | .EVM, .JUMPI => λ evmState => do
         match evmState.stack.pop2 with
           | some ⟨stack , μ₀, μ₁⟩ =>
-            let newPc := if μ₁ != ⟨0⟩ then μ₀ else evmState.pc + ⟨1⟩
+            let newPc := if μ₁ != 0 then μ₀ else evmState.pc + 1
             .ok <| {evmState with pc := newPc, stack := stack}
           | _ => .error .StackUnderflow
     | .EVM, .PC => λ evmState =>

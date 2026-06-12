@@ -78,7 +78,7 @@ def TARGET_BLOB_GAS_PER_BLOCK := 393216
 
 def calcExcessBlobGas (parent : BlockHeader) : Option UInt64 := do
   if parent.excessBlobGas.toNat + parent.blobGasUsed.toNat < TARGET_BLOB_GAS_PER_BLOCK then
-    pure ⟨0⟩
+    pure 0
   else
     pure <| .ofNat <| parent.excessBlobGas.toNat + parent.blobGasUsed.toNat - TARGET_BLOB_GAS_PER_BLOCK
 

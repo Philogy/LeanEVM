@@ -63,7 +63,7 @@ local instance : Inhabited EVM.Transformer where
 private def compareWithEVMdefaults (s₁ s₂ : EvmYul.Storage) : Bool :=
   withDefault s₁ == withDefault s₂
   where
-    withDefault (s : EvmYul.Storage) : EvmYul.Storage := if s.contains ⟨0⟩ then s else s.insert ⟨0⟩ ⟨0⟩
+    withDefault (s : EvmYul.Storage) : EvmYul.Storage := if s.contains 0 then s else s.insert 0 0
 
 /--
 TODO - This should be a generic map complement, but we are not trying to write a library here.
@@ -118,7 +118,7 @@ def executeTransaction
   (header : BlockHeader)
   : Except EVM.Exception EVM.State
 := do
-  let _fuel : ℕ := s.accountMap.find? sender |>.elim ⟨0⟩ (·.balance) |>.toNat
+  let _fuel : ℕ := s.accountMap.find? sender |>.elim 0 (·.balance) |>.toNat
 
   let (ypState, substate, statusCode, totalGasUsed) ←
     EVM.Υ _fuel
@@ -157,7 +157,7 @@ def validateHeaderBeforeTransactions
   (header : BlockHeader)
   : Except EVM.Exception ProcessedBlock
 := do
-  if header.parentHash = ⟨0⟩ then
+  if header.parentHash = 0 then
     throw <| .BlockException .UNKNOWN_PARENT_ZERO
 
   let (some parent : Option ProcessedBlock) :=
@@ -290,7 +290,7 @@ def validateTransaction
       | some sender => (sender.code, sender.nonce, sender.balance)
       | none =>
         dbg_trace s!"could not find sender {EvmYul.toHex S_T.toByteArray}"
-        (.empty, ⟨0⟩, ⟨0⟩)
+        (.empty, 0, 0)
 
   if senderCode ≠ .empty then throw <| .TransactionException .SENDER_NOT_EOA
   if T.base.nonce < senderNonce then
@@ -551,10 +551,10 @@ def processBlocks
               SYSTEM_ADDRESS
               BEACON_ROOTS_ADDRESS
               (.Code beaconRootsAddressCode)
-              ⟨30000000⟩
-              ⟨0xe8d4a51000⟩
-              ⟨0⟩
-              ⟨0⟩
+              30000000
+              0xe8d4a51000
+              0
+              0
               block.blockHeader.parentBeaconBlockRoot
               0
               block.blockHeader

@@ -7,10 +7,10 @@ namespace Yul
 
 open Ast SizeLemmas
 
-def callerAddressUInt256 : UInt256 := ⟨1⟩
-def storageAddressUInt256 : UInt256 := ⟨2⟩
-def caller2AddressUInt256 : UInt256 := ⟨3⟩
-def storage2AddressUInt256 : UInt256 := ⟨4⟩
+def callerAddressUInt256 : UInt256 := 1
+def storageAddressUInt256 : UInt256 := 2
+def caller2AddressUInt256 : UInt256 := 3
+def storage2AddressUInt256 : UInt256 := 4
 def callerAddress := AccountAddress.ofUInt256 callerAddressUInt256
 def storageAddress := AccountAddress.ofUInt256 storageAddressUInt256
 def caller2Address := AccountAddress.ofUInt256 caller2AddressUInt256
@@ -359,9 +359,9 @@ functions := (∅ : Finmap (fun (_ : YulFunctionName) ↦ Yul.Ast.FunctionDefini
   
   let storageAccount : Account .Yul :=
     { code := storageCode
-    , balance := ⟨1000⟩
-    , nonce := ⟨0⟩ 
-    , storage := Batteries.RBMap.ofList [(⟨0⟩, ⟨21⟩)] compare
+    , balance := 1000
+    , nonce := 0 
+    , storage := Batteries.RBMap.ofList [(0, 21)] compare
     , tstorage := ∅
     }
   let callerCode : YulContract := 
@@ -629,8 +629,8 @@ functions := (∅ : Finmap (fun (_ : YulFunctionName) ↦ Yul.Ast.FunctionDefini
   
   let callerAccount : Account .Yul :=
     { code := callerCode
-    , balance := ⟨1000⟩
-    , nonce := ⟨0⟩ 
+    , balance := 1000
+    , nonce := 0 
     , storage := ∅
     , tstorage := ∅
     }
@@ -1056,8 +1056,8 @@ functions := (∅ : Finmap (fun (_ : YulFunctionName) ↦ Yul.Ast.FunctionDefini
     
     let caller2Account : Account .Yul :=
     { code := caller2Code
-    , balance := ⟨1000⟩
-    , nonce := ⟨0⟩ 
+    , balance := 1000
+    , nonce := 0 
     , storage := ∅
     , tstorage := ∅
     }
@@ -1167,8 +1167,8 @@ functions := (∅ : Finmap (fun (_ : YulFunctionName) ↦ Yul.Ast.FunctionDefini
 
 let storage2Account : Account .Yul :=
     { code := storage2Code
-    , balance := ⟨1000⟩
-    , nonce := ⟨0⟩ 
+    , balance := 1000
+    , nonce := 0 
     , storage := ∅
     , tstorage := ∅
     }
@@ -1188,7 +1188,7 @@ let storage2Account : Account .Yul :=
         , code := Inhabited.default
         , codeOwner := callerAddress
         , source := Inhabited.default
-        , weiValue := ⟨0⟩
+        , weiValue := 0
         , sender := Inhabited.default
         , gasPrice := 0
         , header := (Inhabited.default : BlockHeader)
@@ -1199,8 +1199,8 @@ let storage2Account : Account .Yul :=
     , blocks := ∅
     , genesisBlockHeader := Inhabited.default
     , createdAccounts := ∅
-    , gasAvailable := ⟨0⟩
-    , activeWords := ⟨0⟩
+    , gasAvailable := 0
+    , activeWords := 0
     , memory := ByteArray.mk #[]
     , returnData := ByteArray.mk #[]
     , H_return := ByteArray.mk #[]
@@ -1208,7 +1208,7 @@ let storage2Account : Account .Yul :=
   Yul.State.Ok sharedState ∅
     
 def test₁ :=
-  let expr : Expr := .Call (Sum.inr "fun_testStoreAndRetrieveExternal") [.Lit ⟨42⟩]
+  let expr : Expr := .Call (Sum.inr "fun_testStoreAndRetrieveExternal") [.Lit 42]
   match (exec 99 (.ExprStmtCall expr) .none stateEg₁) with
   | .error e => repr e
   | .ok s => s!"{s.toSharedState.accountMap.toList.map (fun (a : AccountAddress × Account .Yul) => repr a.1 ++ " " ++ repr a.2.storage.toList)}"
@@ -1223,7 +1223,7 @@ def test₂ :=
   | .ok s => s!"{s.toSharedState.accountMap.toList.map (fun (a : AccountAddress × Account .Yul) => repr a.1 ++ " " ++ repr a.2.storage.toList)}"
 
 def test₃ :=
-  let expr : Expr := .Call (Sum.inr "fun_testStaticStore") [.Lit ⟨42⟩]
+  let expr : Expr := .Call (Sum.inr "fun_testStaticStore") [.Lit 42]
   match (exec 99 (.ExprStmtCall expr) .none stateEg₂) with
   | .error e => repr e
   | .ok s => s!"{s.toSharedState.accountMap.toList.map (fun (a : AccountAddress × Account .Yul) => repr a.1 ++ " " ++ repr a.2.storage.toList)}"
