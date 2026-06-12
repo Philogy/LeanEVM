@@ -20,7 +20,6 @@ the system or user site-packages, never `--break-system-packages`.
 
 ## Conform suite notes
 
-- **Never run a test sample without first proving it runs ≤30s** (estimate
   from a measured tier). The full suite is for phase gates only, with user
   sign-off. Phase 1 (22,302 tests) finishes inside one 300s-capped run on 8
   threads. Remaining stragglers: `vmPerformance/` (phase 2; loopMul

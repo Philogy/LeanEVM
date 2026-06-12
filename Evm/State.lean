@@ -27,7 +27,7 @@ structure State where
   accounts            : AccountMap
   originalAccounts    : AccountMap
   totalGasUsedInBlock : ℕ
-  transactionReceipts  : Array TransactionReceipt
+  transactionReceipts : Array TransactionReceipt
   substate            : Substate
   executionEnv        : ExecutionEnv
   blocks              : ProcessedBlocks

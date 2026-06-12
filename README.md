@@ -93,6 +93,9 @@ recommended way to run quick samples while iterating:
 lake exe conform 8 stMemoryTest
 ```
 
-Per-test results (with elapsed times) land in `tests_<phase>.txt`; expected
-failures are listed in `Conform/Main.lean`. `--fail-fast` aborts the run on
-the first unexpected failure.
+The default run executes the conformance phase only (~2 minutes on 8
+threads). `--perf` additionally runs the throughput stress tests
+(`vmPerformance/` and blake2f max rounds — minutes per test). Per-test
+results (with elapsed times) land in `tests_<phase>.txt`; expected failures
+are listed in `Conform/Main.lean`. `--fail-fast` aborts the run on the first
+unexpected failure.

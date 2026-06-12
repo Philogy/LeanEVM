@@ -123,24 +123,21 @@ def nproc : IO Nat := do
 
 def main (args : List String) : IO UInt32 := do
   -- `--fail-fast`: the first failure outside ExpectedToFail aborts the run.
+  -- `--perf`: also run the throughput tests (vmPerformance + blake2f max
+  -- rounds) — minutes each, they stress raw interpreter speed, not semantics.
   let failFastFlag := args.contains "--fail-fast"
-  let args := args.filter (· ≠ "--fail-fast")
+  let perfFlag := args.contains "--perf"
+  let args := args.filter (λ a ↦ a ≠ "--fail-fast" ∧ a ≠ "--perf")
   let NumThreads : ℕ := args.head? <&> String.toNat! |>.getD (←nproc)
 
   let ExpectedToFail : Std.HashSet String := {
     "invalid_block_blob_count.json[src/GeneralStateTestsFiller/Pyspecs/cancun/eip4844_blobs/test_blob_txs.py::test_invalid_block_blob_count[fork_Cancun-blockchain_test--blobs_per_tx_(7,)]]",
     "GasUsedHigherThanBlockGasLimitButNotWithRefundsSuicideLast.json[GasUsedHigherThanBlockGasLimitButNotWithRefundsSuicideLast_Cancun]"
   }
- 
 
-  let DelayFiles : Array String :=
-    #["static_Call50000bytesContract50_2_d1g0v0_Cancun",
-      "static_Call50000bytesContract50_2_d0g0v0_Cancun",
-      "static_Call50000bytesContract50_3_d1g0v0_Cancun",
-      "static_Call50000_sha256_d0g0v0_Cancun",
-      "static_Call50000_sha256_d1g0v0_Cancun",
-      "CALLBlake2f_MaxRounds_d0g0v0_Cancun",
-      "SuicideIssue_Cancun"]
+  -- Throughput stress tests (minutes each): excluded from the default
+  -- conformance run, included with `--perf` (alongside vmPerformance/).
+  let PerfTests : Array String := #["CALLBlake2f_MaxRounds_d0g0v0_Cancun"]
 
   let printResults (result : ℕ × Array String) : IO (Array String) := do
     let (success, failure) := result
@@ -163,26 +160,27 @@ def main (args : List String) : IO UInt32 := do
                            (failFast := failFastFlag) >>= printResults
     return if (Std.HashSet.ofArray failed |>.diff ExpectedToFail).isEmpty then 0 else 1
 
-  IO.println s!"Phase 1/3 - No performance tests."
+  IO.println s!"Phase 1 - Conformance."
   let failed₁ ← testFiles (root := "EthereumTests/BlockchainTests/")
                           (directoryBlacklist := #["EthereumTests/BlockchainTests//GeneralStateTests/VMTests/vmPerformance"])
-                          (testBlacklist := DelayFiles)
+                          (testBlacklist := PerfTests)
                           (phase := 1)
                           (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
                           (failFast := failFastFlag) >>= printResults
-  
-  IO.println s!"Phase 2/3 - Performance tests only."
+
+  if !perfFlag then
+    return if (Std.HashSet.ofArray failed₁ |>.diff ExpectedToFail).isEmpty then 0 else 1
+
+  IO.println s!"Phase 2 - Throughput tests (--perf)."
   let failed₂ ← testFiles (root := "EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmPerformance/")
                           (phase := 2)
                           (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
                           (failFast := failFastFlag) >>= printResults
 
-
-  IO.println s!"Phase 3/3 - Individually scheduled tests."
   let failed₃ ← testFiles (root := "EthereumTests/BlockchainTests/")
-                          (testWhitelist := DelayFiles)
+                          (testWhitelist := PerfTests)
                           (phase := 3)
                           (threads := NumThreads)
                           (expectedToFail := ExpectedToFail)
