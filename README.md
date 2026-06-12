@@ -46,9 +46,9 @@ spec is the driver loop `drive` (`Evm/Semantics/Interpreter.lean`), which
 owns the frame stack. Calls and creations are split into non-recursive
 `begin`/`end`/`resumeAfter` handlers (`Call.lean`, `Create.lean`), and the
 public entry points are `messageCall` / `createContract` (the Yellow Paper's
-`Θ` and `Λ`) plus the transaction-level `Υ` in `Evm/Semantics.lean`:
+`Θ` and `Λ`) plus `executeTransaction` (the YP's `Υ`) in `Evm/Semantics.lean`:
 ```
-Evm/Semantics.lean         -- Υ: execute one transaction
+Evm/Semantics.lean         -- executeTransaction (Υ)
 Evm/Semantics/Interpreter.lean
 Evm/Semantics/Step.lean    Evm/Semantics/Instructions.lean
 Evm/Semantics/Call.lean    Evm/Semantics/Create.lean
