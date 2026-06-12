@@ -29,38 +29,21 @@ def directoryBlacklist : List System.FilePath := []
 def fileBlacklist : List System.FilePath := []
 
 /--
-Files with many tests are split into chunks of this size, each chunk its own
-task — otherwise one big fixture serializes a worker for minutes (e.g. the
-164-test point-evaluation file).
+Parse a fixture file once and spawn one pool task per (filtered) test —
+the parsed JSON is shared by reference across the file's test tasks. Returns
+the spawned tasks; the caller awaits them, so workers never block on nested
+waits.
 -/
-def fileChunkSize : Nat := 24
-
-/--
-Run a fixture file, splitting it across parallel tasks when it holds more
-than `fileChunkSize` (filtered) tests.
--/
-def processFileChunked (path : System.FilePath) (isToBeTested : String → Bool)
-                       (abort : Option (IO.Ref Bool)) :
-                       IO (Array Evm.Conform.TestId × Array (Evm.Conform.TestId × Evm.Conform.TestResult × Nat)) := do
+def spawnFileTests (path : System.FilePath) (isToBeTested : String → Bool)
+    (runOne : System.FilePath → Lean.Json → String ->
+      IO (Array Evm.Conform.TestId × Array (Evm.Conform.TestId × Evm.Conform.TestResult × Nat))) :
+    IO (Array (Task (Except IO.Error (Array Evm.Conform.TestId × Array (Evm.Conform.TestId × Evm.Conform.TestResult × Nat))))) := do
   let file ← Lean.Json.fromFile path
   let names := (Evm.Conform.Parser.testNamesOfTest file).toOption.getD #[] |>.filter isToBeTested
-  if names.size ≤ fileChunkSize then
-    Evm.Conform.processTestFile path isToBeTested (abort := abort)
-  else do
-    let chunks := names.toList.toChunks fileChunkSize
-    let mut subtasks := #[]
-    for chunk in chunks do
-      let chunkSet : Std.HashSet String := .ofList chunk
-      subtasks := subtasks.push <|
-        ←IO.asTask (Evm.Conform.processTestFile path
-          (λ n ↦ isToBeTested n && chunkSet.contains n) (abort := abort))
-    let mut discarded := #[]
-    let mut results := #[]
-    for t in subtasks do
-      let (d, r) ← IO.ofExcept (←IO.wait t)
-      discarded := discarded.append d
-      results := results.append r
-    return (discarded, results)
+  let mut subtasks := #[]
+  for name in names do
+    subtasks := subtasks.push (←IO.asTask (runOne path file name))
+  return subtasks
 
 def testFiles (root               : System.FilePath)
               (directoryBlacklist : Array System.FilePath := #[])
@@ -91,49 +74,51 @@ def testFiles (root               : System.FilePath)
 
   if ←System.FilePath.pathExists (logFile phase) then IO.FS.removeFile (logFile phase)
 
-  -- One task per fixture file; each file is parsed exactly once, inside its
-  -- task. The runtime's task pool load-balances the files across workers
-  -- (pool size = LEAN_NUM_THREADS, defaulting to the hardware core count).
-  -- Each task reports completion through a shared counter, so progress
-  -- (`[k/M files, n tests, f failed]`) and failures stream live.
-  let progress ← IO.mkRef ((0, 0, 0, 0) : ℕ × ℕ × ℕ × ℕ)
+  -- Two-level pooling: a task per file parses the JSON and spawns one task
+  -- per test (sharing the parsed object); the main thread flattens and awaits
+  -- the per-test tasks. No task ever blocks on another, so the worker pool
+  -- stays saturated until the global test queue itself drains.
+  let progress ← IO.mkRef ((0, 0, 0) : Nat × Nat × Nat)
   let abort ← IO.mkRef false
-  let numFiles := testFiles.size
-  let mut tasks : Array (Task _) := .empty
-  IO.println s!"Scheduling {numFiles} test files for parallel execution..."
+  let runOne (path : System.FilePath) (file : Lean.Json) (name : String) :
+      IO (Array Evm.Conform.TestId × Array (Evm.Conform.TestId × Evm.Conform.TestResult × Nat)) := do
+    if failFast ∧ (← abort.get) then
+      return (#[], #[])
+    let r ← Evm.Conform.processSingleTest path file name
+    for ((f, t), res, ms) in r.2 do
+      log f t res ms phase
+      if res.isSome then
+        let id := s!"{f.fileName.getD f.toString}[{t}]"
+        if expectedToFail.contains id then
+          IO.println s!"XFAIL (expected) {id}"
+        else
+          IO.println s!"FAIL {id}"
+          if failFast then
+            IO.println "fail-fast: aborting remaining tests"
+            abort.set true
+    let (ts, fl, xf) ← progress.modifyGet λ (ts, fl, xf) ↦
+      let fails := r.2.filter (·.2.1.isSome) |>.size
+      let isXf := r.2.any λ ((f, t), res, _) ↦
+        res.isSome ∧ expectedToFail.contains s!"{f.fileName.getD f.toString}[{t}]"
+      let v := (ts + r.2.size, fl + (if isXf then 0 else fails), xf + (if isXf then fails else 0))
+      (v, v)
+    if ts % 500 == 0 ∧ ts != 0 then
+      IO.println s!"[{ts} tests done, {fl} failed, {xf} xfail]"
+    pure r
+
+  IO.println s!"Scheduling {testFiles.size} test files for parallel execution..."
+  let mut spawners : Array (Task _) := .empty
   for path in testFiles do
-    tasks := tasks.push <| ←IO.asTask do
-      if failFast ∧ (← abort.get) then
-        pure (#[], #[])
-      else
-      let r ← processFileChunked path isToBeTested
-        (abort := if failFast then some abort else none)
-      let mut unexpected := 0
-      let mut xfails := 0
-      for ((file, test), res, _) in r.2 do
-        if res.isSome then
-          let id := s!"{file.fileName.getD file.toString}[{test}]"
-          if expectedToFail.contains id then
-            xfails := xfails + 1
-            IO.println s!"XFAIL (expected) {id}"
-          else
-            unexpected := unexpected + 1
-            IO.println s!"FAIL {id}"
-            if failFast then
-              IO.println "fail-fast: aborting remaining tests"
-              abort.set true
-      for ((file, test), res, ms) in r.2 do
-        log file test res ms phase
-      let (fs, ts, fl, xf) ← progress.modifyGet λ (fs, ts, fl, xf) ↦
-        let v := (fs + 1, ts + r.2.size, fl + unexpected, xf + xfails)
-        (v, v)
-      IO.println s!"[{fs}/{numFiles} files, {ts} tests, {fl} failed, {xf} xfail]"
-      pure r
+    spawners := spawners.push (←IO.asTask (spawnFileTests path isToBeTested runOne))
 
   let mut failedTests : Array String := .empty
 
   IO.println s!"Running..."
-  let testResults ← tasks.mapM (IO.wait · >>= IO.ofExcept)
+  let mut testTasks : Array (Task _) := .empty
+  for s in spawners do
+    testTasks := testTasks.append (←IO.ofExcept (←IO.wait s))
+  IO.println s!"All {testTasks.size} test tasks spawned."
+  let testResults ← testTasks.mapM (IO.wait · >>= IO.ofExcept)
   for (discarded, batch) in testResults do
     discardedFiles := discardedFiles.append discarded
     for ((file, test), res, _) in batch do

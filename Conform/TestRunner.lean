@@ -651,6 +651,27 @@ def processTest (entry : TestEntry) (isTimed : Option (Nat × TestId) := .none) 
         errorF := if verbose then verboseError else discardError
 
 /--
+Run one already-parsed test from a fixture file. Used by the per-test task
+pool — the file is parsed once and shared by all its test tasks.
+-/
+def processSingleTest (path : System.FilePath) (file : Lean.Json) (testName : String)
+    : IO (Array TestId × Array (TestId × TestResult × Nat)) := do
+  let testId : TestId := (path, testName)
+  let test := Except.mapError Conform.Exception.CannotParse <| file.getObjValAs? TestEntry testName
+  match test with
+  | .error _ =>
+    IO.eprintln s!"Cannot parse: {testId}"
+    return (#[testId], #[])
+  | .ok test =>
+    if test.network.startsWith "Cancun" then
+      let t0 ← IO.monoMsNow
+      let res ← processTest test
+      let t1 ← IO.monoMsNow
+      return (#[], #[(testId, res, t1 - t0)])
+    else
+      return (#[], #[])
+
+/--
 Run all (non-filtered) tests of a single fixture file. The file is read and
 parsed exactly once — scheduling is per-file so a fixture is never re-parsed
 per test.
