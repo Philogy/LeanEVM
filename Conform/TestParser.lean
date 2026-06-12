@@ -1,5 +1,6 @@
 import Lean.Data.Json
 
+import Evm.Rlp
 import Evm.Wheels
 import Evm.Operations
 import Evm.Semantics

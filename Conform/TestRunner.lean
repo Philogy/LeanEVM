@@ -1,6 +1,7 @@
 import Evm.Machine.ExecutionState
 import Evm.Semantics
 import Evm.Semantics.Gas
+import Evm.Rlp
 import Evm.Wheels
 
 import Evm.State.TransactionOps
@@ -240,7 +241,7 @@ def validateTransaction
         throw <| .TransactionException .INITCODE_SIZE_EXCEEDED
     | some _ => pure ()
 
-  let some T_RLP := RLP (← (L_X T)) | throw <| .TransactionException .IllFormedRLP
+  let some T_RLP := Rlp.encode (← (L_X T)) | throw <| .TransactionException .IllFormedRLP
 
   let r : ℕ := fromByteArrayBigEndian T.base.r
   let s : ℕ := fromByteArrayBigEndian T.base.s
@@ -306,15 +307,15 @@ def validateTransaction
   pure S_T
 
  where
-  L_X (T : Transaction) : Except Evm.Exception 𝕋 := -- (317)
-    let accessEntryRLP : AccountAddress × Array UInt256 → 𝕋
-      | ⟨a, s⟩ => .𝕃 [.𝔹 a.toByteArray, .𝕃 (s.map (.𝔹 ∘ UInt256.toByteArray)).toList]
-    let accessEntriesRLP (aEs : List (AccountAddress × Array UInt256)) : 𝕋 :=
-      .𝕃 (aEs.map accessEntryRLP)
+  L_X (T : Transaction) : Except Evm.Exception Rlp := -- (317)
+    let accessEntryRLP : AccountAddress × Array UInt256 → Rlp
+      | ⟨a, s⟩ => .list [.bytes a.toByteArray, .list (s.map (.bytes ∘ UInt256.toByteArray)).toList]
+    let accessEntriesRLP (aEs : List (AccountAddress × Array UInt256)) : Rlp :=
+      .list (aEs.map accessEntryRLP)
     match T with
       | /- 0 -/ .legacy t =>
         if t.w.toNat ∈ [27, 28] then
-          .ok ∘ .𝕃 ∘ List.map .𝔹 <|
+          .ok ∘ .list ∘ List.map .bytes <|
             [ BE t.nonce.toNat -- Tₙ
             , BE t.gasPrice.toNat -- Tₚ
             , BE t.gasLimit.toNat -- T_g
@@ -325,7 +326,7 @@ def validateTransaction
             ]
         else
           if t.w = .ofNat (35 + chainId * 2) ∨ t.w = .ofNat (36 + chainId * 2) then
-            .ok ∘ .𝕃 ∘ List.map .𝔹 <|
+            .ok ∘ .list ∘ List.map .bytes <|
               [ BE t.nonce.toNat -- Tₙ
               , BE t.gasPrice.toNat -- Tₚ
               , BE t.gasLimit.toNat -- T_g
@@ -342,44 +343,44 @@ def validateTransaction
             throw <| .TransactionException .IllFormedRLP
 
       | /- 1 -/ .access t =>
-        .ok ∘ .𝕃 <|
-          [ .𝔹 (BE t.chainId.toNat) -- T_c
-          , .𝔹 (BE t.nonce.toNat) -- Tₙ
-          , .𝔹 (BE t.gasPrice.toNat) -- Tₚ
-          , .𝔹 (BE t.gasLimit.toNat) -- T_g
+        .ok ∘ .list <|
+          [ .bytes (BE t.chainId.toNat) -- T_c
+          , .bytes (BE t.nonce.toNat) -- Tₙ
+          , .bytes (BE t.gasPrice.toNat) -- Tₚ
+          , .bytes (BE t.gasLimit.toNat) -- T_g
           , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .𝔹 (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .𝔹 (BE t.value.toNat) -- T_v
-          , .𝔹 t.data  -- p
+            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
+          , .bytes (BE t.value.toNat) -- T_v
+          , .bytes t.data  -- p
           , accessEntriesRLP t.accessList -- T_A
           ]
       | /- 2 -/ .dynamic t =>
-        .ok ∘ .𝕃 <|
-          [ .𝔹 (BE t.chainId.toNat) -- T_c
-          , .𝔹 (BE t.nonce.toNat) -- Tₙ
-          , .𝔹 (BE t.maxPriorityFeePerGas.toNat) -- T_f
-          , .𝔹 (BE t.maxFeePerGas.toNat) -- Tₘ
-          , .𝔹 (BE t.gasLimit.toNat) -- T_g
+        .ok ∘ .list <|
+          [ .bytes (BE t.chainId.toNat) -- T_c
+          , .bytes (BE t.nonce.toNat) -- Tₙ
+          , .bytes (BE t.maxPriorityFeePerGas.toNat) -- T_f
+          , .bytes (BE t.maxFeePerGas.toNat) -- Tₘ
+          , .bytes (BE t.gasLimit.toNat) -- T_g
           , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .𝔹 (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .𝔹 (BE t.value.toNat) -- Tᵥ
-          , .𝔹 t.data -- p
+            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
+          , .bytes (BE t.value.toNat) -- Tᵥ
+          , .bytes t.data -- p
           , accessEntriesRLP t.accessList -- T_A
           ]
       | /- 3 -/ .blob t =>
-        .ok ∘ .𝕃 <|
-          [ .𝔹 (BE t.chainId.toNat) -- T_c
-          , .𝔹 (BE t.nonce.toNat) -- Tₙ
-          , .𝔹 (BE t.maxPriorityFeePerGas.toNat) -- T_f
-          , .𝔹 (BE t.maxFeePerGas.toNat) -- Tₘ
-          , .𝔹 (BE t.gasLimit.toNat) -- T_g
+        .ok ∘ .list <|
+          [ .bytes (BE t.chainId.toNat) -- T_c
+          , .bytes (BE t.nonce.toNat) -- Tₙ
+          , .bytes (BE t.maxPriorityFeePerGas.toNat) -- T_f
+          , .bytes (BE t.maxFeePerGas.toNat) -- Tₘ
+          , .bytes (BE t.gasLimit.toNat) -- T_g
           , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .𝔹 (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .𝔹 (BE t.value.toNat) -- Tᵥ
-          , .𝔹 t.data -- p
+            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
+          , .bytes (BE t.value.toNat) -- Tᵥ
+          , .bytes t.data -- p
           , accessEntriesRLP t.accessList -- T_A
-          , .𝔹 (BE t.maxFeePerBlobGas.toNat)
-          , .𝕃 (t.blobVersionedHashes.map .𝔹)
+          , .bytes (BE t.maxFeePerBlobGas.toNat)
+          , .list (t.blobVersionedHashes.map .bytes)
           ]
 
 def validateBlock

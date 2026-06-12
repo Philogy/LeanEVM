@@ -1,4 +1,5 @@
 
+import Evm.Rlp
 import Evm.Wheels
 import Evm.PerformIO
 import Evm.Maps.AccountMap
@@ -25,19 +26,19 @@ deriving Repr, BEq
 
 namespace Withdrawal
 
-def to𝕋 : Withdrawal → 𝕋
+def toRlp : Withdrawal → Rlp
   | {index, validatorIndex, address, amount} =>
-    .𝕃
-      [ .𝔹 (BE index.toFin.val)
-      , .𝔹 (BE validatorIndex.toFin.val)
-      , .𝔹 (address.toByteArray)
-      , .𝔹 (BE amount.toFin.val)
+    .list
+      [ .bytes (BE index.toFin.val)
+      , .bytes (BE validatorIndex.toFin.val)
+      , .bytes (address.toByteArray)
+      , .bytes (BE amount.toFin.val)
       ]
 
 end Withdrawal
 
 def Withdrawal.toBlobs (w : ℕ × ByteArray) : Option (String × String) := do
-  let rlpᵢ ← RLP (.𝔹 (BE w.1))
+  let rlpᵢ ← Rlp.encode (.bytes (BE w.1))
   let rlp ← w.2
   pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
 

@@ -1,6 +1,7 @@
 import Mathlib.Data.List.AList
 
 import Evm.UInt256
+import Evm.Rlp
 import Evm.Wheels
 import Evm.State.TrieRoot
 import Conform.Wheels
@@ -139,7 +140,7 @@ def Transaction.type : Transaction → UInt8
   | .blob _ => 3
 
 def Transaction.toBlobs (t : ℕ × ByteArray) : Option (String × String) := do
-  let rlpᵢ ← RLP (.𝔹 (BE t.1))
+  let rlpᵢ ← Rlp.encode (.bytes (BE t.1))
   let rlp := t.2
   pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
 
@@ -153,20 +154,20 @@ structure TransactionReceipt where
   statusCode               : Bool      /- R_z -/
   cumulativeGasUsedInBlock : ℕ         /- R_u -/
   bloomFilter              : ByteArray /- R_b -/
-  logSeries                : LogSeries /- R_l -/
+  logSeries                : LogSeries /- Rlp.encodeList -/
 deriving BEq, Inhabited, Repr
 
-def L_R : TransactionReceipt → 𝕋
+def L_R : TransactionReceipt → Rlp
   | ⟨_, statusCode, cumulativeGasUsedInBlock, bloomFilter, logSeries⟩ =>
-  .𝕃
-    [ if statusCode then .𝔹 (BE 1) else .𝔹 (BE 0)
-    , .𝔹 (BE cumulativeGasUsedInBlock)
-    , .𝔹 bloomFilter
-    , logSeries.to𝕋
+  .list
+    [ if statusCode then .bytes (BE 1) else .bytes (BE 0)
+    , .bytes (BE cumulativeGasUsedInBlock)
+    , .bytes bloomFilter
+    , logSeries.toRlp
     ]
 
 def TransactionReceipt.toBlobs (w : ℕ × ByteArray) : Option (String × String) := do
-  let rlpᵢ ← RLP (.𝔹 (BE w.1))
+  let rlpᵢ ← Rlp.encode (.bytes (BE w.1))
   let rlp ← w.2
   pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
 
@@ -177,7 +178,7 @@ def TransactionReceipt.computeTrieRoot (ws : Array ByteArray) : Option ByteArray
     | some ws => (ByteArray.ofBlob (blobComputeTrieRoot ws)).toOption
 
 def TransactionReceipt.toTrieValue (r : TransactionReceipt) : ByteArray :=
-  let rlp := Option.get! ∘ RLP ∘ L_R <| r
+  let rlp := Option.get! ∘ Rlp.encode ∘ L_R <| r
   if r.type = 0 then rlp else ⟨#[r.type]⟩ ++ rlp
 
 end Evm

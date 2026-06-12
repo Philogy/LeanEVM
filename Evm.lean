@@ -1,4 +1,5 @@
 import Evm.Crypto.BN_ADD
+import Evm.Rlp
 import Evm.Crypto.BN_MUL
 import Evm.Crypto.EllipticCurves
 import Evm.Crypto.Evmrs

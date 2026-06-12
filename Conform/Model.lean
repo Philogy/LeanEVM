@@ -3,6 +3,7 @@ import Lean.Data.Json
 
 -- import Evm.Maps
 import Evm.Operations
+import Evm.Rlp
 import Evm.Wheels
 import Evm.State.Withdrawal
 import Evm.State.Block

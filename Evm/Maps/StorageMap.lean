@@ -20,6 +20,7 @@ TODO - All of this is very ugly.
 import Batteries.Data.RBMap
 import Mathlib.Data.Multiset.Sort
 
+import Evm.Rlp
 import Evm.Wheels
 import Evm.State.TrieRoot
 import Evm.Crypto.Keccak256
@@ -40,7 +41,7 @@ def Storage.toEvmYulStorage (self : Storage) : Evm.Storage :=
 
 def toBlobs (pair : UInt256 × UInt256) : Option (String × String) := do
   let kec := ffi.KEC pair.1.toByteArray
-  let rlp ← RLP (.𝔹 (BE pair.2.toNat))
+  let rlp ← Rlp.encode (.bytes (BE pair.2.toNat))
   pure (Evm.toHex kec, Evm.toHex rlp)
 
 def computeTrieRoot (storage : Storage) : Option ByteArray :=

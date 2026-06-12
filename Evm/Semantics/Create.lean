@@ -1,3 +1,4 @@
+import Evm.Rlp
 import Evm.Machine.ExecutionStateOps
 import Evm.Semantics.Gas
 import Evm.Semantics.GasConstants
@@ -16,7 +17,7 @@ private def L_A (s : AccountAddress) (n : UInt256) (ζ : Option ByteArray) (i : 
   let s := s.toByteArray
   let n := BE n.toNat
   match ζ with
-    | none   => RLP <| .𝕃 [.𝔹 s, .𝔹 n]
+    | none   => Rlp.encode <| .list [.bytes s, .bytes n]
     | some ζ => .some <| BE 255 ++ s ++ ζ ++ ffi.KEC i
 
 /--

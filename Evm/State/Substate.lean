@@ -1,5 +1,6 @@
 import Batteries.Data.RBMap
 import Evm.UInt256
+import Evm.Rlp
 import Evm.Wheels
 import Evm.State.Account
 
@@ -24,18 +25,18 @@ structure LogEntry where
   data    : ByteArray
 deriving BEq, Inhabited, Repr
 
-def LogEntry.to𝕋 : LogEntry → 𝕋
+def LogEntry.toRlp : LogEntry → Rlp
   | ⟨address, topics, data⟩ =>
-    .𝕃
-      [ .𝔹 address.toByteArray
-      , .𝕃 <| topics.toList.map (.𝔹 ∘ UInt256.toByteArray)
-      , .𝔹 data
+    .list
+      [ .bytes address.toByteArray
+      , .list <| topics.toList.map (.bytes ∘ UInt256.toByteArray)
+      , .bytes data
       ]
 
 abbrev LogSeries := Array LogEntry
 
-def LogSeries.to𝕋 (logSeries : LogSeries) : 𝕋 :=
-  .𝕃 (logSeries.toList.map LogEntry.to𝕋)
+def LogSeries.toRlp (logSeries : LogSeries) : Rlp :=
+  .list (logSeries.toList.map LogEntry.toRlp)
 
 /--
 The `Substate` `A`. Section 6.1.

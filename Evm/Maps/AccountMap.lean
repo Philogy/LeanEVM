@@ -19,6 +19,7 @@ TODO - All of this is very ugly.
 
 import Batteries.Data.RBMap
 
+import Evm.Rlp
 import Evm.Wheels
 
 import Evm.Maps.StorageMap
@@ -85,7 +86,7 @@ def stateTrieRoot (σ : PersistentAccountMap) : Option ByteArray :=
         storage.foldl (init := s!"{storage.size}\n") λ acc (slot, value) ↦
           acc
             ++ Evm.toHex (ffi.KEC slot.toByteArray) ++ "\n"
-            ++ Evm.toHex ((RLP (.𝔹 (BE value.toNat))).get!) ++ "\n"
+            ++ Evm.toHex ((Rlp.encode (.bytes (BE value.toNat))).get!) ++ "\n"
       acc
         ++ Evm.toHex (ffi.KEC addr.toByteArray) ++ "\n"
         ++ Evm.toHex (BE account.nonce.toNat) ++ "\n"
