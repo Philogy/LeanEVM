@@ -436,8 +436,11 @@ def X (fuel : ℕ) (validJumps : Array UInt256) (evmState : State)
       let instr@(w, _) := decode I_b evmState.pc |>.getD (.STOP, .none)
       -- (159)
       let W (w : Operation .EVM) (s : Stack UInt256) : Bool :=
-        w ∈ [.CREATE, .CREATE2, .SSTORE, .SELFDESTRUCT, .LOG0, .LOG1, .LOG2, .LOG3, .LOG4, .TSTORE] ∨
-        (w = .CALL ∧ s[2]? ≠ some 0)
+        match w with
+          | .CREATE | .CREATE2 | .SSTORE | .SELFDESTRUCT
+          | .LOG0 | .LOG1 | .LOG2 | .LOG3 | .LOG4 | .TSTORE => true
+          | .CALL => s[2]? ≠ some 0
+          | _ => false
       -- Exceptional halting (158)
       let Z (evmState : State) : Except EVM.ExecutionException (State × ℕ) := do
         let cost₁ := memoryExpansionCost evmState w
@@ -483,12 +486,10 @@ def X (fuel : ℕ) (validJumps : Array UInt256) (evmState : State)
 
         pure (evmState, cost₂)
       let H (μ : MachineState) (w : Operation .EVM) : Option ByteArray :=
-        if w ∈ [.RETURN, .REVERT] then
-          some <| μ.H_return
-        else
-          if w ∈ [.STOP, .SELFDESTRUCT] then
-            some .empty
-          else none
+        match w with
+          | .RETURN | .REVERT => some μ.H_return
+          | .STOP | .SELFDESTRUCT => some .empty
+          | _ => none
       match Z evmState with
         | .error e =>
           .error e

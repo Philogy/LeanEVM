@@ -64,6 +64,23 @@ def ofNat (n : ℕ) : UInt256 :=
   ⟨ .ofNat n          , .ofNat (n >>> 32) , .ofNat (n >>> 64) , .ofNat (n >>> 96)
   , .ofNat (n >>> 128), .ofNat (n >>> 160), .ofNat (n >>> 192), .ofNat (n >>> 224) ⟩
 
+/-- Runtime implementation of `toNat` (`@[csimp]`-substituted, proven equal):
+values below 2^64 — gas, memory offsets, sizes — skip the `BitVec` append
+construction entirely. -/
+def toNatFast (a : UInt256) : ℕ :=
+  if a.l2 == 0 && a.l3 == 0 && a.l4 == 0 && a.l5 == 0 && a.l6 == 0 && a.l7 == 0
+  then (a.l0.toUInt64 + (a.l1.toUInt64 <<< 32)).toNat
+  else a.toBitVec.toNat
+
+/-- Runtime implementation of `ofNat` (`@[csimp]`-substituted, proven equal):
+small naturals avoid the eight shifted `UInt32.ofNat` conversions. -/
+def ofNatFast (n : ℕ) : UInt256 :=
+  if n < 2^64
+  then ⟨.ofNat n, .ofNat (n >>> 32), 0, 0, 0, 0, 0, 0⟩
+  else
+    ⟨ .ofNat n          , .ofNat (n >>> 32) , .ofNat (n >>> 64) , .ofNat (n >>> 96)
+    , .ofNat (n >>> 128), .ofNat (n >>> 160), .ofNat (n >>> 192), .ofNat (n >>> 224) ⟩
+
 instance {n : ℕ} : OfNat UInt256 n := ⟨ofNat n⟩
 instance : Inhabited UInt256 := ⟨ofNat 0⟩
 
@@ -72,6 +89,58 @@ instance : ToString UInt256 where
 
 instance : Repr UInt256 where
   reprPrec n _ := repr n.toNat
+
+/-- Limb decomposition of `toNat`. -/
+theorem toNat_limbs (a : UInt256) :
+    a.toNat = a.l0.toNat + a.l1.toNat * 2^32 + a.l2.toNat * 2^64 + a.l3.toNat * 2^96 +
+      a.l4.toNat * 2^128 + a.l5.toNat * 2^160 + a.l6.toNat * 2^192 + a.l7.toNat * 2^224 := by
+  obtain ⟨l0, l1, l2, l3, l4, l5, l6, l7⟩ := a
+  simp only [toNat, toBitVec, BitVec.toNat_append]
+  rw [← Nat.shiftLeft_add_eq_or_of_lt (by exact l0.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l1.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l2.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l3.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l4.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l5.toBitVec.isLt),
+      ← Nat.shiftLeft_add_eq_or_of_lt (by exact l6.toBitVec.isLt)]
+  simp only [Nat.shiftLeft_eq]
+  show _ = l0.toBitVec.toNat + l1.toBitVec.toNat * 2^32 + l2.toBitVec.toNat * 2^64 +
+    l3.toBitVec.toNat * 2^96 + l4.toBitVec.toNat * 2^128 + l5.toBitVec.toNat * 2^160 +
+    l6.toBitVec.toNat * 2^192 + l7.toBitVec.toNat * 2^224
+  ring
+
+@[csimp] theorem toNat_eq_toNatFast : @toNat = @toNatFast := by
+  funext a
+  obtain ⟨l0, l1, l2, l3, l4, l5, l6, l7⟩ := a
+  simp only [toNatFast]
+  split
+  · rename_i h
+    simp only [Bool.and_eq_true, beq_iff_eq] at h
+    obtain ⟨⟨⟨⟨⟨h2, h3⟩, h4⟩, h5⟩, h6⟩, h7⟩ := h
+    subst h2 h3 h4 h5 h6 h7
+    rw [toNat_limbs]
+    have q0 : l0.toNat < 2^32 := l0.toBitVec.isLt
+    have q1 : l1.toNat < 2^32 := l1.toBitVec.isLt
+    simp only [UInt64.toNat_add, UInt64.toNat_shiftLeft, UInt32.toNat_toUInt64,
+      UInt64.toNat_ofNat]
+    norm_num
+    omega
+  · rfl
+
+@[csimp] theorem ofNat_eq_ofNatFast : @ofNat = @ofNatFast := by
+  funext n
+  simp only [ofNatFast]
+  split
+  · rename_i h
+    have e64 : n >>> 64 = 0 := by omega
+    have e96 : n >>> 96 = 0 := by omega
+    have e128 : n >>> 128 = 0 := by omega
+    have e160 : n >>> 160 = 0 := by omega
+    have e192 : n >>> 192 = 0 := by omega
+    have e224 : n >>> 224 = 0 := by omega
+    simp only [ofNat, e64, e96, e128, e160, e192, e224]
+    rfl
+  · rfl
 
 /-! ### Limb-level operations (proven equivalent to `BitVec 256`) -/
 
@@ -100,11 +169,42 @@ def sub (a b : UInt256) : UInt256 :=
   ⟨s0.toUInt32, s1.toUInt32, s2.toUInt32, s3.toUInt32,
    s4.toUInt32, s5.toUInt32, s6.toUInt32, s7.toUInt32⟩
 
--- NOTE: multiplication currently round-trips through `Nat` (see below) rather
--- than using limb arithmetic: a limb-level schoolbook multiply is easy to
--- write but its `BitVec` equivalence is exactly the kind of goal SAT-based
--- `bv_decide` struggles with (multiplier equivalence). Until that proof
--- lands, `Nat` keeps `mul` out of the trust surface.
+/-- One multiply-accumulate step of the schoolbook multiplication:
+returns the 32-bit digit and the carry-out. -/
+def mulCarry (x m c : UInt64) : UInt32 × UInt64 :=
+  let t := x * m + c
+  (t.toUInt32, t >>> 32)
+
+/-- 256×32-bit multiplication, truncated to 256 bits. Carry chain never
+overflows `UInt64`: `(2^32-1)·(2^32-1) + (2^32-1) + (2^32-1) < 2^64`. -/
+def mulLimb (a : UInt256) (m : UInt32) : UInt256 :=
+  let m64 := m.toUInt64
+  let s0 := mulCarry a.l0.toUInt64 m64 0
+  let s1 := mulCarry a.l1.toUInt64 m64 s0.2
+  let s2 := mulCarry a.l2.toUInt64 m64 s1.2
+  let s3 := mulCarry a.l3.toUInt64 m64 s2.2
+  let s4 := mulCarry a.l4.toUInt64 m64 s3.2
+  let s5 := mulCarry a.l5.toUInt64 m64 s4.2
+  let s6 := mulCarry a.l6.toUInt64 m64 s5.2
+  let s7 := mulCarry a.l7.toUInt64 m64 s6.2
+  ⟨s0.1, s1.1, s2.1, s3.1, s4.1, s5.1, s6.1, s7.1⟩
+
+/-- Shift left by one limb (32 bits), dropping the top limb. -/
+def shiftLimb (x : UInt256) : UInt256 := ⟨0, x.l0, x.l1, x.l2, x.l3, x.l4, x.l5, x.l6⟩
+
+/-- Full 256×256-bit multiplication mod 2^256: Horner over the limbs of `b`,
+most significant first. Proven equivalent to `BitVec.mul` in `toBitVec_mul`
+without any SAT/`ofReduceBool` dependence — see `toNat_mul`. -/
+def mul (a b : UInt256) : UInt256 :=
+  let acc := mulLimb a b.l7
+  let acc := add (shiftLimb acc) (mulLimb a b.l6)
+  let acc := add (shiftLimb acc) (mulLimb a b.l5)
+  let acc := add (shiftLimb acc) (mulLimb a b.l4)
+  let acc := add (shiftLimb acc) (mulLimb a b.l3)
+  let acc := add (shiftLimb acc) (mulLimb a b.l2)
+  let acc := add (shiftLimb acc) (mulLimb a b.l1)
+  add (shiftLimb acc) (mulLimb a b.l0)
+
 
 def land (a b : UInt256) : UInt256 :=
   ⟨a.l0 &&& b.l0, a.l1 &&& b.l1, a.l2 &&& b.l2, a.l3 &&& b.l3,
@@ -154,17 +254,147 @@ theorem ofBitVec_toBitVec (a : UInt256) : ofBitVec a.toBitVec = a := by
   simp [ofBitVec, toBitVec]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> · apply UInt32.toBitVec_inj.mp; simp; bv_decide
 
-theorem toBitVec_add (a b : UInt256) : (add a b).toBitVec = a.toBitVec + b.toBitVec := by
-  obtain ⟨a0, a1, a2, a3, a4, a5, a6, a7⟩ := a
-  obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := b
-  simp [add, toBitVec]
-  bv_decide
+set_option maxHeartbeats 1000000 in
+/-- `add` is correct over `Nat` — proved without SAT/`ofReduceBool`. -/
+theorem toNat_add (x y : UInt256) : (add x y).toNat = (x.toNat + y.toNat) % 2^256 := by
+  obtain ⟨x0, x1, x2, x3, x4, x5, x6, x7⟩ := x
+  obtain ⟨y0, y1, y2, y3, y4, y5, y6, y7⟩ := y
+  simp only [add, toNat_limbs]
+  simp only [UInt64.toNat_toUInt32, UInt64.toNat_add, UInt64.toNat_shiftRight,
+    UInt32.toNat_toUInt64, UInt64.toNat_ofNat]
+  have q0 : x0.toNat < 2^32 := x0.toBitVec.isLt
+  have q1 : x1.toNat < 2^32 := x1.toBitVec.isLt
+  have q2 : x2.toNat < 2^32 := x2.toBitVec.isLt
+  have q3 : x3.toNat < 2^32 := x3.toBitVec.isLt
+  have q4 : x4.toNat < 2^32 := x4.toBitVec.isLt
+  have q5 : x5.toNat < 2^32 := x5.toBitVec.isLt
+  have q6 : x6.toNat < 2^32 := x6.toBitVec.isLt
+  have q7 : x7.toNat < 2^32 := x7.toBitVec.isLt
+  have r0 : y0.toNat < 2^32 := y0.toBitVec.isLt
+  have r1 : y1.toNat < 2^32 := y1.toBitVec.isLt
+  have r2 : y2.toNat < 2^32 := y2.toBitVec.isLt
+  have r3 : y3.toNat < 2^32 := y3.toBitVec.isLt
+  have r4 : y4.toNat < 2^32 := y4.toBitVec.isLt
+  have r5 : y5.toNat < 2^32 := y5.toBitVec.isLt
+  have r6 : y6.toNat < 2^32 := y6.toBitVec.isLt
+  have r7 : y7.toNat < 2^32 := y7.toBitVec.isLt
+  norm_num
+  omega
+
+theorem toBitVec_add (a b : UInt256) : (add a b).toBitVec = a.toBitVec + b.toBitVec :=
+  BitVec.eq_of_toNat_eq (by simpa [BitVec.toNat_add] using toNat_add a b)
 
 theorem toBitVec_sub (a b : UInt256) : (sub a b).toBitVec = a.toBitVec - b.toBitVec := by
   obtain ⟨a0, a1, a2, a3, a4, a5, a6, a7⟩ := a
   obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := b
   simp [sub, toBitVec]
   bv_decide
+
+/-! #### Multiplication correctness — axiom-free (no SAT / `ofReduceBool`) -/
+
+theorem mulCarry_spec (x m c : UInt64)
+    (hx : x.toNat < 2^32) (hm : m.toNat < 2^32) (hc : c.toNat < 2^32) :
+    (mulCarry x m c).1.toNat + 2^32 * (mulCarry x m c).2.toNat = x.toNat * m.toNat + c.toNat
+    ∧ (mulCarry x m c).2.toNat < 2^32 := by
+  have hp : x.toNat * m.toNat ≤ (2^32 - 1) * (2^32 - 1) :=
+    Nat.mul_le_mul (by omega) (by omega)
+  simp only [mulCarry, UInt64.toNat_toUInt32, UInt64.toNat_shiftRight, UInt64.toNat_add,
+    UInt64.toNat_mul, UInt64.toNat_ofNat]
+  generalize x.toNat * m.toNat = p at hp
+  norm_num
+  omega
+
+set_option maxHeartbeats 1000000 in
+theorem toNat_mulLimb (a : UInt256) (m : UInt32) :
+    (mulLimb a m).toNat = (a.toNat * m.toNat) % 2^256 := by
+  obtain ⟨a0, a1, a2, a3, a4, a5, a6, a7⟩ := a
+  have h32 : ∀ x : UInt32, x.toUInt64.toNat < 2^32 := λ x ↦ by
+    simp [UInt32.toNat_toUInt64]; exact x.toBitVec.isLt
+  have h0' : (0 : UInt64).toNat < 2^32 := by simp
+  obtain ⟨e0, b0⟩ := mulCarry_spec a0.toUInt64 m.toUInt64 0 (h32 a0) (h32 m) h0'
+  obtain ⟨e1, b1⟩ := mulCarry_spec a1.toUInt64 m.toUInt64 _ (h32 a1) (h32 m) b0
+  obtain ⟨e2, b2⟩ := mulCarry_spec a2.toUInt64 m.toUInt64 _ (h32 a2) (h32 m) b1
+  obtain ⟨e3, b3⟩ := mulCarry_spec a3.toUInt64 m.toUInt64 _ (h32 a3) (h32 m) b2
+  obtain ⟨e4, b4⟩ := mulCarry_spec a4.toUInt64 m.toUInt64 _ (h32 a4) (h32 m) b3
+  obtain ⟨e5, b5⟩ := mulCarry_spec a5.toUInt64 m.toUInt64 _ (h32 a5) (h32 m) b4
+  obtain ⟨e6, b6⟩ := mulCarry_spec a6.toUInt64 m.toUInt64 _ (h32 a6) (h32 m) b5
+  obtain ⟨e7, b7⟩ := mulCarry_spec a7.toUInt64 m.toUInt64 _ (h32 a7) (h32 m) b6
+  simp only [UInt32.toNat_toUInt64] at e0 e1 e2 e3 e4 e5 e6 e7
+  simp only [mulLimb, toNat_limbs]
+  rw [show
+      (a0.toNat + a1.toNat * 2^32 + a2.toNat * 2^64 + a3.toNat * 2^96 + a4.toNat * 2^128 +
+        a5.toNat * 2^160 + a6.toNat * 2^192 + a7.toNat * 2^224) * m.toNat =
+      a0.toNat * m.toNat + (a1.toNat * m.toNat) * 2^32 + (a2.toNat * m.toNat) * 2^64 +
+      (a3.toNat * m.toNat) * 2^96 + (a4.toNat * m.toNat) * 2^128 +
+      (a5.toNat * m.toNat) * 2^160 + (a6.toNat * m.toNat) * 2^192 +
+      (a7.toNat * m.toNat) * 2^224 from by ring]
+  set s0 := mulCarry a0.toUInt64 m.toUInt64 0 with hs0
+  set s1 := mulCarry a1.toUInt64 m.toUInt64 s0.2 with hs1
+  set s2 := mulCarry a2.toUInt64 m.toUInt64 s1.2 with hs2
+  set s3 := mulCarry a3.toUInt64 m.toUInt64 s2.2 with hs3
+  set s4 := mulCarry a4.toUInt64 m.toUInt64 s3.2 with hs4
+  set s5 := mulCarry a5.toUInt64 m.toUInt64 s4.2 with hs5
+  set s6 := mulCarry a6.toUInt64 m.toUInt64 s5.2 with hs6
+  set s7 := mulCarry a7.toUInt64 m.toUInt64 s6.2 with hs7
+  set p0 := a0.toNat * m.toNat with hp0
+  set p1 := a1.toNat * m.toNat with hp1
+  set p2 := a2.toNat * m.toNat with hp2
+  set p3 := a3.toNat * m.toNat with hp3
+  set p4 := a4.toNat * m.toNat with hp4
+  set p5 := a5.toNat * m.toNat with hp5
+  set p6 := a6.toNat * m.toNat with hp6
+  set p7 := a7.toNat * m.toNat with hp7
+  have d0 : s0.1.toNat < 2^32 := s0.1.toBitVec.isLt
+  have d1 : s1.1.toNat < 2^32 := s1.1.toBitVec.isLt
+  have d2 : s2.1.toNat < 2^32 := s2.1.toBitVec.isLt
+  have d3 : s3.1.toNat < 2^32 := s3.1.toBitVec.isLt
+  have d4 : s4.1.toNat < 2^32 := s4.1.toBitVec.isLt
+  have d5 : s5.1.toNat < 2^32 := s5.1.toBitVec.isLt
+  have d6 : s6.1.toNat < 2^32 := s6.1.toBitVec.isLt
+  have d7 : s7.1.toNat < 2^32 := s7.1.toBitVec.isLt
+  norm_num at e0
+  omega
+
+theorem toNat_shiftLimb (x : UInt256) : (shiftLimb x).toNat = x.toNat * 2^32 % 2^256 := by
+  obtain ⟨l0, l1, l2, l3, l4, l5, l6, l7⟩ := x
+  simp only [shiftLimb, toNat_limbs]
+  have h0 : (0 : UInt32).toNat = 0 := rfl
+  have q0 : l0.toNat < 2^32 := l0.toBitVec.isLt
+  have q1 : l1.toNat < 2^32 := l1.toBitVec.isLt
+  have q2 : l2.toNat < 2^32 := l2.toBitVec.isLt
+  have q3 : l3.toNat < 2^32 := l3.toBitVec.isLt
+  have q4 : l4.toNat < 2^32 := l4.toBitVec.isLt
+  have q5 : l5.toNat < 2^32 := l5.toBitVec.isLt
+  have q6 : l6.toNat < 2^32 := l6.toBitVec.isLt
+  have q7 : l7.toNat < 2^32 := l7.toBitVec.isLt
+  rw [h0]
+  omega
+
+set_option maxHeartbeats 2000000 in
+theorem toNat_mul (a b : UInt256) : (mul a b).toNat = a.toNat * b.toNat % 2^256 := by
+  obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := b
+  simp only [mul, toNat_add, toNat_shiftLimb, toNat_mulLimb]
+  rw [show (UInt256.mk b0 b1 b2 b3 b4 b5 b6 b7).toNat =
+        b0.toNat + b1.toNat * 2^32 + b2.toNat * 2^64 + b3.toNat * 2^96 + b4.toNat * 2^128 +
+        b5.toNat * 2^160 + b6.toNat * 2^192 + b7.toNat * 2^224 from toNat_limbs _]
+  rw [show a.toNat * (b0.toNat + b1.toNat * 2^32 + b2.toNat * 2^64 + b3.toNat * 2^96 +
+        b4.toNat * 2^128 + b5.toNat * 2^160 + b6.toNat * 2^192 + b7.toNat * 2^224) =
+      a.toNat * b0.toNat + (a.toNat * b1.toNat) * 2^32 + (a.toNat * b2.toNat) * 2^64 +
+      (a.toNat * b3.toNat) * 2^96 + (a.toNat * b4.toNat) * 2^128 +
+      (a.toNat * b5.toNat) * 2^160 + (a.toNat * b6.toNat) * 2^192 +
+      (a.toNat * b7.toNat) * 2^224 from by ring]
+  set q0 := a.toNat * b0.toNat with hq0
+  set q1 := a.toNat * b1.toNat with hq1
+  set q2 := a.toNat * b2.toNat with hq2
+  set q3 := a.toNat * b3.toNat with hq3
+  set q4 := a.toNat * b4.toNat with hq4
+  set q5 := a.toNat * b5.toNat with hq5
+  set q6 := a.toNat * b6.toNat with hq6
+  set q7 := a.toNat * b7.toNat with hq7
+  omega
+
+theorem toBitVec_mul (a b : UInt256) : (mul a b).toBitVec = a.toBitVec * b.toBitVec :=
+  BitVec.eq_of_toNat_eq (by simpa [BitVec.toNat_mul] using toNat_mul a b)
 
 theorem toBitVec_land (a b : UInt256) : (land a b).toBitVec = a.toBitVec &&& b.toBitVec := by
   obtain ⟨a0, a1, a2, a3, a4, a5, a6, a7⟩ := a
@@ -254,8 +484,6 @@ instance : Ord UInt256 where
   compare a b := if a < b then .lt else if b < a then .gt else .eq
 
 /-! ### Operations via `Nat`/`BitVec` round-trip (correct by construction) -/
-
-def mul (a b : UInt256) : UInt256 := ofNat (a.toNat * b.toNat)
 
 def div (a b : UInt256) : UInt256 := ofNat (a.toNat / b.toNat)
 
