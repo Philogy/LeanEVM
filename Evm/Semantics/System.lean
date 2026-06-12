@@ -147,14 +147,14 @@ def systemOp (op : SystemOp) (fr : Frame) (exec : ExecutionState) : Step :=
     | .CREATE => do
       requireStateMod exec
       let (stack, value, initOffset, initSize) ← exec.stack.pop3
-      if initSize > 49152 then throw .OutOfGass
+      if initSize > 49152 then throw .OutOfGas
       let exec ← chargeMemExpansion exec initOffset.toNat initSize.toNat
       let exec ← charge (createCost initSize) exec
       createArm fr exec stack value initOffset initSize none
     | .CREATE2 => do
       requireStateMod exec
       let (stack, value, initOffset, initSize, salt) ← exec.stack.pop4
-      if initSize > 49152 then throw .OutOfGass
+      if initSize > 49152 then throw .OutOfGas
       let exec ← chargeMemExpansion exec initOffset.toNat initSize.toNat
       let exec ← charge (create2Cost initSize) exec
       createArm fr exec stack value initOffset initSize (some <| Evm.UInt256.toByteArray salt)

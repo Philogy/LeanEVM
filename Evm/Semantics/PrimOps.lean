@@ -30,10 +30,10 @@ instance : MonadLift Option (Except ExecutionException) :=
 /-- The frame continues executing with the updated state. -/
 @[inline] def continueWith (exec : ExecutionState) : Step := .ok (.next exec)
 
-/-- Check-and-subtract a gas cost: `OutOfGass` when unaffordable. -/
+/-- Check-and-subtract a gas cost: `OutOfGas` when unaffordable. -/
 @[inline] def charge (cost : ℕ) (exec : ExecutionState) :
     Except ExecutionException ExecutionState :=
-  if exec.gasAvailable.toNat < cost then .error .OutOfGass
+  if exec.gasAvailable.toNat < cost then .error .OutOfGas
   else .ok { exec with gasAvailable := exec.gasAvailable - .ofNat cost }
 
 /--

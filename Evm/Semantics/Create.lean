@@ -170,7 +170,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
     then 0 else .ofNat result.address
   let newReturnData : ByteArray := if success then .empty else result.output
   if (gas + gasRemaining).toNat < allButOneSixtyFourth gas.toNat then
-    throw .OutOfGass
+    throw .OutOfGas
   let exec' :=
     { evmState with
         accounts := result.accounts

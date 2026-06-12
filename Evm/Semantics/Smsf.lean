@@ -35,7 +35,7 @@ def smsfOp (op : SmsfOp) (fr : Frame) (exec : ExecutionState) : Step :=
         (λ s key ↦ sloadCost (s.substate.accessedStorageKeys.contains (s.executionEnv.address, key))) exec
     | .SSTORE => do
       requireStateMod exec
-      if exec.gasAvailable.toNat ≤ Gcallstipend then throw .OutOfGass
+      if exec.gasAvailable.toNat ≤ Gcallstipend then throw .OutOfGas
       let (stack, key, newValue) ← exec.stack.pop2
       let self := exec.executionEnv.address
       let originalValue := exec.originalAccounts.find? self |>.option 0 (·.storage.findD key 0)

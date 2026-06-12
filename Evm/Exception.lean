@@ -8,7 +8,7 @@ namespace Evm
 inductive ExecutionException where
   | OutOfFuel
   | InvalidInstruction
-  | OutOfGass
+  | OutOfGas
   | BadJumpDestination
   | StackOverflow
   | StackUnderflow
@@ -21,7 +21,7 @@ instance : Repr ExecutionException where
     match s with
       | .OutOfFuel => "OutOfFuel"
       | .InvalidInstruction => "InvalidInstruction"
-      | .OutOfGass => "OutOfGass"
+      | .OutOfGas => "OutOfGas"
       | .BadJumpDestination => "BadJumpDestination"
       | .StackOverflow => "StackOverflow"
       | .StackUnderflow => "StackUnderflow"
