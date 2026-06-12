@@ -1,10 +1,10 @@
 import EvmYul.Wheels
 import EvmYul.PerformIO
-import EvmYul.CachedPython
+import EvmYul.Python
 import Conform.Wheels
 
 def blobBN_MUL (x₀ y₀ n : String) : String :=
-  totallySafePerformIO ∘ cachedPythonRun <|
+  totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput x₀ y₀ n
   where pythonCommandOfInput (x₀ y₀ n : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,

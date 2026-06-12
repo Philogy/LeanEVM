@@ -1,10 +1,10 @@
 import EvmYul.Wheels
 import EvmYul.PerformIO
-import EvmYul.CachedPython
+import EvmYul.Python
 import Conform.Wheels
 
 def blobPointEval (data : String) : String :=
-  totallySafePerformIO ∘ cachedPythonRun <|
+  totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput data
   where pythonCommandOfInput (data : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,

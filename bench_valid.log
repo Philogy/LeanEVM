@@ -1,0 +1,101 @@
+PANIC at List.get!Internal Init.GetElem:335:18: invalid index
+backtrace:
+0   conform                             0x0000000108ab0350 _ZN4leanL15print_backtraceEb + 60
+1   conform                             0x0000000108aa7fa0 _ZN4leanL15lean_panic_implEPKcmb + 176
+2   conform                             0x0000000108aa8050 lean_panic_fn_borrowed + 64
+3   conform                             0x00000001054cf0d8 EvmYul.EVM.memoryExpansionCost.μᵢ' (evmyul) + 632
+4   conform                             0x00000001054cf51c EvmYul.EVM.memoryExpansionCost (evmyul) + 32
+5   conform                             0x0000000105506204 EvmYul.EVM.X (evmyul) + 792
+6   conform                             0x00000001054f7250 EvmYul.EVM.Ξ (evmyul) + 568
+7   conform                             0x00000001054f8820 EvmYul.EVM.Θ (evmyul) + 3292
+8   conform                             0x00000001054fb794 EvmYul.EVM.call (evmyul) + 3892
+9   conform                             0x00000001054fe794 EvmYul.EVM.step (evmyul) + 7404
+10  conform                             0x0000000105507000 EvmYul.EVM.X (evmyul) + 4372
+11  conform                             0x00000001054f7250 EvmYul.EVM.Ξ (evmyul) + 568
+12  conform                             0x00000001054f8820 EvmYul.EVM.Θ (evmyul) + 3292
+13  conform                             0x000000010550a724 EvmYul.EVM.Υ (evmyul) + 2688
+14  conform                             0x00000001055167e8 EvmYul.Conform.executeTransaction (evmyul) + 1092
+15  conform                             0x0000000105520618 Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks.processBlock (evmyul) + 412
+16  conform                             0x00000001055215b4 EvmYul.Conform.processBlocks.processBlock (evmyul) + 2952
+17  conform                             0x0000000105522aac Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks (evmyul) + 2100
+18  conform                             0x00000001055261d4 EvmYul.Conform.preImpliesPost (evmyul) + 88
+19  conform                             0x00000001055275ec EvmYul.Conform.processTest (evmyul) + 100
+20  conform                             0x000000010552b96c Array.forIn'Unsafe.loop [private] spec at EvmYul.Conform.processTestFile (evmyul) + 996
+21  conform                             0x000000010552c0b0 EvmYul.Conform.processTestFile (evmyul) + 504
+22  conform                             0x0000000104e6dc00 Array.forIn'Unsafe.loop [λ, private] spec at testFiles (evmyul) + 16
+23  conform                             0x0000000108ab4154 <apply/1> + 5720
+24  conform                             0x0000000108accb44 _ZN4leanL18lean_io_as_task_fnEP11lean_objectS1_ + 20
+25  conform                             0x0000000108ab37c8 <apply/1> + 3276
+26  conform                             0x0000000108ab13cc _ZN4lean12task_manager8run_taskERNSt3__111unique_lockINS1_5mutexEEEP9lean_task + 152
+27  conform                             0x0000000108ab230c _ZZN4lean12task_manager12spawn_workerEvENKUlvE_clEv + 304
+28  conform                             0x0000000108aa6308 _ZN4lean7lthread3imp5_mainEPv + 52
+29  libsystem_pthread.dylib             0x0000000187d21c58 _pthread_start + 136
+30  libsystem_pthread.dylib             0x0000000187d1cc1c thread_start + 8
+PANIC at List.get!Internal Init.GetElem:335:18: invalid index
+backtrace:
+0   conform                             0x0000000108ab0350 _ZN4leanL15print_backtraceEb + 60
+1   conform                             0x0000000108aa7fa0 _ZN4leanL15lean_panic_implEPKcmb + 176
+2   conform                             0x0000000108aa8050 lean_panic_fn_borrowed + 64
+3   conform                             0x00000001054cf0ec EvmYul.EVM.memoryExpansionCost.μᵢ' (evmyul) + 652
+4   conform                             0x00000001054cf51c EvmYul.EVM.memoryExpansionCost (evmyul) + 32
+5   conform                             0x0000000105506204 EvmYul.EVM.X (evmyul) + 792
+6   conform                             0x00000001054f7250 EvmYul.EVM.Ξ (evmyul) + 568
+7   conform                             0x00000001054f8820 EvmYul.EVM.Θ (evmyul) + 3292
+8   conform                             0x00000001054fb794 EvmYul.EVM.call (evmyul) + 3892
+9   conform                             0x00000001054fe794 EvmYul.EVM.step (evmyul) + 7404
+10  conform                             0x0000000105507000 EvmYul.EVM.X (evmyul) + 4372
+11  conform                             0x00000001054f7250 EvmYul.EVM.Ξ (evmyul) + 568
+12  conform                             0x00000001054f8820 EvmYul.EVM.Θ (evmyul) + 3292
+13  conform                             0x000000010550a724 EvmYul.EVM.Υ (evmyul) + 2688
+14  conform                             0x00000001055167e8 EvmYul.Conform.executeTransaction (evmyul) + 1092
+15  conform                             0x0000000105520618 Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks.processBlock (evmyul) + 412
+16  conform                             0x00000001055215b4 EvmYul.Conform.processBlocks.processBlock (evmyul) + 2952
+17  conform                             0x0000000105522aac Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks (evmyul) + 2100
+18  conform                             0x00000001055261d4 EvmYul.Conform.preImpliesPost (evmyul) + 88
+19  conform                             0x00000001055275ec EvmYul.Conform.processTest (evmyul) + 100
+20  conform                             0x000000010552b96c Array.forIn'Unsafe.loop [private] spec at EvmYul.Conform.processTestFile (evmyul) + 996
+21  conform                             0x000000010552c0b0 EvmYul.Conform.processTestFile (evmyul) + 504
+22  conform                             0x0000000104e6dc00 Array.forIn'Unsafe.loop [λ, private] spec at testFiles (evmyul) + 16
+23  conform                             0x0000000108ab4154 <apply/1> + 5720
+24  conform                             0x0000000108accb44 _ZN4leanL18lean_io_as_task_fnEP11lean_objectS1_ + 20
+25  conform                             0x0000000108ab37c8 <apply/1> + 3276
+26  conform                             0x0000000108ab13cc _ZN4lean12task_manager8run_taskERNSt3__111unique_lockINS1_5mutexEEEP9lean_task + 152
+27  conform                             0x0000000108ab230c _ZZN4lean12task_manager12spawn_workerEvENKUlvE_clEv + 304
+28  conform                             0x0000000108aa6308 _ZN4lean7lthread3imp5_mainEPv + 52
+29  libsystem_pthread.dylib             0x0000000187d21c58 _pthread_start + 136
+30  libsystem_pthread.dylib             0x0000000187d1cc1c thread_start + 8
+PANIC at List.get!Internal Init.GetElem:335:18: invalid index
+backtrace:
+0   conform                             0x0000000108ab0350 _ZN4leanL15print_backtraceEb + 60
+1   conform                             0x0000000108aa7fa0 _ZN4leanL15lean_panic_implEPKcmb + 176
+2   conform                             0x0000000108aa8050 lean_panic_fn_borrowed + 64
+3   conform                             0x00000001054cabf4 EvmYul.EVM.Csstore (evmyul) + 1612
+4   conform                             0x0000000105506454 EvmYul.EVM.X (evmyul) + 1384
+5   conform                             0x00000001054f7250 EvmYul.EVM.Ξ (evmyul) + 568
+6   conform                             0x00000001054f8820 EvmYul.EVM.Θ (evmyul) + 3292
+7   conform                             0x000000010550a724 EvmYul.EVM.Υ (evmyul) + 2688
+8   conform                             0x00000001055167e8 EvmYul.Conform.executeTransaction (evmyul) + 1092
+9   conform                             0x0000000105520618 Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks.processBlock (evmyul) + 412
+10  conform                             0x00000001055215b4 EvmYul.Conform.processBlocks.processBlock (evmyul) + 2952
+11  conform                             0x0000000105522aac Array.foldlMUnsafe.fold [private] spec at EvmYul.Conform.processBlocks (evmyul) + 2100
+12  conform                             0x00000001055261d4 EvmYul.Conform.preImpliesPost (evmyul) + 88
+13  conform                             0x00000001055275ec EvmYul.Conform.processTest (evmyul) + 100
+14  conform                             0x000000010552b96c Array.forIn'Unsafe.loop [private] spec at EvmYul.Conform.processTestFile (evmyul) + 996
+15  conform                             0x000000010552c0b0 EvmYul.Conform.processTestFile (evmyul) + 504
+16  conform                             0x0000000104e6dc00 Array.forIn'Unsafe.loop [λ, private] spec at testFiles (evmyul) + 16
+17  conform                             0x0000000108ab4154 <apply/1> + 5720
+18  conform                             0x0000000108accb44 _ZN4leanL18lean_io_as_task_fnEP11lean_objectS1_ + 20
+19  conform                             0x0000000108ab37c8 <apply/1> + 3276
+20  conform                             0x0000000108ab13cc _ZN4lean12task_manager8run_taskERNSt3__111unique_lockINS1_5mutexEEEP9lean_task + 152
+21  conform                             0x0000000108ab230c _ZZN4lean12task_manager12spawn_workerEvENKUlvE_clEv + 304
+22  conform                             0x0000000108aa6308 _ZN4lean7lthread3imp5_mainEPv + 52
+23  libsystem_pthread.dylib             0x0000000187d21c58 _pthread_start + 136
+24  libsystem_pthread.dylib             0x0000000187d1cc1c thread_start + 8
+Scheduling 218 test files for parallel execution...
+Running...
+Total tests: 443
+The post was NOT equal to the resulting state: 0
+Succeeded: 443
+Success rate of: 100.000000
+Failed tests:
+#[]

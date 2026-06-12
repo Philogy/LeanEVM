@@ -2,14 +2,14 @@
 
 import EvmYul.Wheels
 import EvmYul.PerformIO
-import EvmYul.CachedPython
+import EvmYul.Python
 import Conform.Wheels
 import EvmYul.SpongeHash.Keccak256
 
 def secp256k1n : ℕ := 115792089237316195423570985008687907852837564279074904382605163141518161494337
 
 def blobECDSARECOVER (e v r s : String) : String :=
-  totallySafePerformIO ∘ cachedPythonRun <|
+  totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput e v r s
   where pythonCommandOfInput (e v r s : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,
@@ -17,7 +17,7 @@ def blobECDSARECOVER (e v r s : String) : String :=
   }
 
 def blobSign (e pᵣ : String) : List String :=
-  (String.split · Char.isWhitespace |>.toList |>.map (·.toString)) ∘ totallySafePerformIO ∘ cachedPythonRun <|
+  (String.split · Char.isWhitespace |>.toList |>.map (·.toString)) ∘ totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput e pᵣ
   where pythonCommandOfInput (e pᵣ : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,

@@ -1,10 +1,10 @@
 import EvmYul.Wheels
 import EvmYul.PerformIO
-import EvmYul.CachedPython
+import EvmYul.Python
 import Conform.Wheels
 
 def blobBN_ADD (x₀ y₀ x₁ y₁ : String) : String :=
-  totallySafePerformIO ∘ cachedPythonRun <|
+  totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput x₀ y₀ x₁ y₁
   where pythonCommandOfInput (x₀ y₀ x₁ y₁ : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,

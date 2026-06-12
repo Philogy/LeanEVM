@@ -1,10 +1,10 @@
 import EvmYul.PerformIO
-import EvmYul.CachedPython
+import EvmYul.Python
 import EvmYul.Wheels
 import Conform.Wheels
 
 def blobSHA256 (d : String) : String :=
-  totallySafePerformIO ∘ cachedPythonRun <|
+  totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput d
   where pythonCommandOfInput (d : String) : IO.Process.SpawnArgs := {
     cmd := pythonExe,
