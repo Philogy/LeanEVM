@@ -11,3 +11,6 @@ tests_*.txt
 conform_run.log
 conform_sample.txt
 tools/evmrs/target/
+.baseline_tests_1.txt
+full_run.log
+*.log

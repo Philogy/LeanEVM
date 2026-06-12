@@ -1,8 +1,0 @@
-Scheduling 1 test files for parallel execution...
-Running...
-Total tests: 5
-The post was NOT equal to the resulting state: 0
-Succeeded: 5
-Success rate of: 100.000000
-Failed tests:
-#[]

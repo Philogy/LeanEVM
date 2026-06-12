@@ -3,8 +3,8 @@ import EvmYul.SpongeHash.Keccak256
 
 import EvmYul.UInt256
 import EvmYul.Wheels
+import EvmYul.Operations
 
-import EvmYul.Yul.Ast
 
 namespace EvmYul
 
@@ -16,14 +16,14 @@ def π : Batteries.RBSet AccountAddress compare :=
   Batteries.RBSet.ofList ((List.range 11).tail.map (Fin.ofNat _)) compare
 
 inductive ToExecute (τ : OperationType) where
-  | Code (code : Yul.Ast.contractCode τ)
+  | Code (code : ByteArray)
   | Precompiled (precompiled : AccountAddress)
 
 structure PersistentAccountState (τ : OperationType) where
   nonce    : UInt256
   balance  : UInt256
   storage  : Storage
-  code     : (Yul.Ast.contractCode τ)
+  code     : ByteArray
   deriving BEq, Inhabited, Repr
 
 /--

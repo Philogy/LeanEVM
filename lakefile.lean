@@ -84,6 +84,3 @@ lean_lib «EvmYul»
 lean_exe «conform» where
   root := `Conform.Main
   extraDepTargets := #[`evmrs]
-
-lean_exe «yulSemanticsTests» where
-  root := `EvmYul.Yul.YulSemanticsTests.Main

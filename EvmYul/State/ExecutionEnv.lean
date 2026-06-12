@@ -1,7 +1,7 @@
 import EvmYul.Wheels
+import EvmYul.Operations
 import EvmYul.UInt256
 import EvmYul.State.BlockHeader
-import EvmYul.Yul.Ast
 
 namespace EvmYul
 
@@ -24,7 +24,7 @@ structure ExecutionEnv (τ : OperationType) where
   source    : AccountAddress
   weiValue  : UInt256
   calldata : ByteArray
-  code      : (Yul.Ast.contractCode τ)
+  code      : ByteArray
   gasPrice  : ℕ
   header    : BlockHeader
   depth     : ℕ
