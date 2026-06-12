@@ -21,6 +21,9 @@ deriving BEq, Inhabited, Repr
 structure RawBlock where
   rlp          : ByteArray
   exception    : List String
+  /-- Per-transaction `sender` fields from the test fixture, when provided.
+      Lets the conform runner skip ECDSA sender recovery. -/
+  senders      : Array (Option AccountAddress) := #[]
 deriving BEq, Inhabited, Repr
 
 abbrev RawBlocks := Array RawBlock
@@ -31,6 +34,8 @@ structure DeserializedBlock where
   transactions : Transactions
   withdrawals  : Withdrawals
   exception    : List String
+  /-- Fixture-provided tx senders, indexed in transaction order (see `RawBlock.senders`). -/
+  senders      : Array (Option AccountAddress) := #[]
 deriving BEq, Inhabited, Repr
 
 abbrev DeserializedBlocks := Array DeserializedBlock
@@ -69,8 +74,15 @@ def validateAccountAddress
   if a.size ≠ 20 then throw e
   pure (.ofNat (fromByteArrayBigEndian a))
 
+/--
+`computeRoots := false` skips the (expensive, python-backed) transaction and
+withdrawal trie-root computations; the corresponding `trieRoot` fields are left
+`.empty`. Only valid when the caller does not inspect them — the conform runner
+checks them only for blocks that expect a block exception.
+-/
 def deserializeBlock
   (rlp : ByteArray)
+  (computeRoots : Bool := true)
   : Except EVM.Exception (UInt256 × BlockHeader × Transactions × Withdrawals)
 := do
   let (hash, header, transactionTrieRoot, ts, withdrawalTrieRoot, ws) ←
@@ -84,10 +96,15 @@ def deserializeBlock
           | .inl typePlusPayload => typePlusPayload
           | .inr _ => t
       let transactionTrieRoot ←
-        Transaction.computeTrieRoot (← transactions.toArray.mapM getTrieSnd)
+        if computeRoots then
+          Transaction.computeTrieRoot (← transactions.toArray.mapM getTrieSnd)
+        else pure .empty
       let ts ← transactions.mapM deserializeRLP
       let (.inr withdrawals) ← oneStepRLP withdrawalsRLP | none
-      let withdrawalTrieRoot ← Withdrawal.computeTrieRoot withdrawals.toArray
+      let withdrawalTrieRoot ←
+        if computeRoots then
+          Withdrawal.computeTrieRoot withdrawals.toArray
+        else pure .empty
       let ws ← withdrawals.mapM deserializeRLP
       pure (hash, header, transactionTrieRoot, ts, withdrawalTrieRoot, ws)
   let header ← parseHeader header

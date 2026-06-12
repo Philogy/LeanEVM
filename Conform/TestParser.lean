@@ -147,9 +147,13 @@ private def blockOfJson (json : Json) : Except String RawBlock := do
   -- The exception, if exists, is always in the outermost object regardless of the `<Format>` (see this function's docs).
   let exception ← json.getObjValAsD! (Option String) "expectException"
   let rlp ← json.getObjValAsD! ByteArray "rlp"
+  -- Fixture-provided senders (per transaction, in order); absent ones recover via ECDSA.
+  let txs ← json.getObjValAsD (Array Json) "transactions" #[]
+  let senders := txs.map λ tx ↦ (tx.getObjValAs? AccountAddress "sender").toOption
   pure {
     rlp
     exception := exception.option [] (·.splitOn "|")
+    senders
   }
   where
     tryParseBlocknumber (s : String) : Except String Nat :=

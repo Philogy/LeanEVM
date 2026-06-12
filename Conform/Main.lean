@@ -33,6 +33,7 @@ def testFiles (root               : System.FilePath)
               (fileBlacklist      : Array System.FilePath := #[])
               (testBlacklist      : Array String := #[])
               (testWhitelist      : Array String := #[])
+              (fileFilter         : String := "")
               (phase              : ℕ)
               (threads            : ℕ := 1)
               (timed              : Bool := false) : IO (Nat × Array String) := do
@@ -46,35 +47,25 @@ def testFiles (root               : System.FilePath)
       System.FilePath.walkDir root (pure <| · ∉ directoryBlacklist)
 
   let testFiles := testFiles.filter (· ∉ fileBlacklist)
+  let testFiles := testFiles.filter
+    λ f ↦ fileFilter.isEmpty || (f.toString.splitOn fileFilter).length != 1
 
   let mut discardedFiles : Array EvmYul.Conform.TestId := #[]
   let mut numSuccess := 0
 
   if ←System.FilePath.pathExists (logFile phase) then IO.FS.removeFile (logFile phase)
 
-  let testJsons ← testFiles.mapM Lean.Json.fromFile
-  let testNames : Array (System.FilePath × Array String) :=
-    testJsons.zip testFiles |>.map
-      λ (json, filepath) ↦
-        match json.getObj? with
-        | .error _ => panic! "Malformed test json."
-        | .ok x => (filepath, x.toArray.map Prod.fst |>.filter isToBeTested)
-
+  -- One task per fixture file; each file is parsed exactly once, inside its
+  -- task. The runtime's task pool load-balances the files across workers
+  -- (pool size = LEAN_NUM_THREADS, defaulting to the hardware core count).
   let mut tasks : Array (Task _) := .empty
-  let mut thread := 0
-  let mut tests : Array (Array (System.FilePath × String)) := .replicate threads #[]
-
-  IO.println s!"Scheduling tests for parallel execution..."
-  for (path, names) in testNames do
-    for name in names do
-      tests := tests.set! thread (tests[thread]! |>.push (path, name))
-      thread := thread + 1; thread := thread % threads
-  for i in [0:threads] do
-    tasks := tasks.push (←IO.asTask <| EvmYul.Conform.processTests tests[i]! (if timed then .some i else .none))
+  IO.println s!"Scheduling {testFiles.size} test files for parallel execution..."
+  for path in testFiles do
+    tasks := tasks.push
+      (←IO.asTask <| EvmYul.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none))
 
   let mut failedTests : Array String := .empty
 
-  IO.println s!"Scheduled {tests.foldl (· + ·.size) 0} tests on {threads} thread{if threads == 1 then "" else "s"}."
   IO.println s!"Running..."
   let testResults ← tasks.mapM (IO.wait · >>= IO.ofExcept)
   for (discarded, batch) in testResults do
@@ -115,6 +106,15 @@ def main (args : List String) : IO UInt32 := do
     IO.println s!"Success rate of: {(success.toFloat / (failure.size + success).toFloat) * 100.0}"
     IO.println s!"Failed tests:\n{failure}"
     return failure
+
+  -- Optional second CLI arg: substring filter on fixture file paths.
+  -- Runs only matching files in a single phase — for quick samples and profiling.
+  if let some pat := args[1]? then
+    let failed ← testFiles (root := "EthereumTests/BlockchainTests/")
+                           (fileFilter := pat)
+                           (phase := 0)
+                           (threads := NumThreads) >>= printResults
+    return if (Std.HashSet.ofArray failed |>.diff ExpectedToFail).isEmpty then 0 else 1
 
   IO.println s!"Phase 1/3 - No performance tests."
   let failed₁ ← testFiles (root := "EthereumTests/BlockchainTests/")
