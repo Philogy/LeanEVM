@@ -58,6 +58,8 @@ def ofBitVec (b : BitVec 256) : UInt256 :=
   , ⟨b.extractLsb' 128 32⟩, ⟨b.extractLsb' 160 32⟩
   , ⟨b.extractLsb' 192 32⟩, ⟨b.extractLsb' 224 32⟩ ⟩
 
+def ofUInt32 (a : UInt32) : UInt256 := ⟨a, 0, 0, 0, 0, 0, 0, 0 ⟩
+
 def toNat (a : UInt256) : ℕ := a.toBitVec.toNat
 
 def ofNat (n : ℕ) : UInt256 :=

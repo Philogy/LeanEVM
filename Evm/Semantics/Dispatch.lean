@@ -140,10 +140,7 @@ def stepFrame (fr : Frame) : Signal :=
   else
     let δ := stackPopCount op
     let α := stackPushCount op
-    let stackLen := exec.stack.size
-    if stackLen < δ then
-      .halted (.exception .StackUnderflow)
-    else if stackLen - δ + α > 1024 then
+    if exec.stack.size - δ + α > 1024 then
       .halted (.exception .StackOverflow)
     else
       match dispatch op arg fr exec with

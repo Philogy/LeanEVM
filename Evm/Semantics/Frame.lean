@@ -1,3 +1,4 @@
+import Evm.UInt256
 import Evm.Machine.ExecutionState
 import Evm.Semantics.Params
 
@@ -29,8 +30,11 @@ once on frame entry.
 -/
 structure Frame where
   kind       : FrameKind
-  validJumps : Array UInt256
+  validJumps : Array UInt32
   exec       : ExecutionState
+
+def Frame.get_dest (f : Frame) (dest : UInt256) : Option UInt32 :=
+  f.validJumps.find? (fun actual => UInt256.ofUInt32 actual = dest)
 
 /-- How a frame finished executing. -/
 inductive FrameHalt where

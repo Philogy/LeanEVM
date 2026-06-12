@@ -11,7 +11,7 @@ The EVM execution state (world state + machine state + control state).
 - `stack` `s`
 -/
 structure ExecutionState extends Evm.State, Evm.MachineState where
-  pc    : UInt256
+  pc    : UInt32
   stack : Stack UInt256
   deriving Inhabited
 

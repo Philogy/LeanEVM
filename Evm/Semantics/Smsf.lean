@@ -56,21 +56,19 @@ def smsfOp (op : SmsfOp) (fr : Frame) (exec : ExecutionState) : Step :=
     | .JUMP => do
       let exec ← charge Gmid exec
       let (stack, dest) ← exec.stack.pop
-      if fr.validJumps.contains dest then
-        continueWith { exec with pc := dest, stack := stack }
-      else
-        throw .BadJumpDestination
+      match fr.get_dest dest with
+      | .some new_pc => continueWith { exec with pc := new_pc, stack := stack }
+      | .none => .error .BadJumpDestination
     | .JUMPI => do
       let exec ← charge Ghigh exec
       let (stack, dest, cond) ← exec.stack.pop2
       if cond != 0 then
-        if fr.validJumps.contains dest then
-          continueWith { exec with pc := dest, stack := stack }
-        else
-          throw .BadJumpDestination
+        match fr.get_dest dest with
+        | .some new_pc => continueWith { exec with pc := new_pc, stack := stack }
+        | .none => .error .BadJumpDestination
       else
         continueWith { exec with pc := exec.pc + 1, stack := stack }
-    | .PC => pushOp (λ s ↦ s.pc) exec
+    | .PC => pushOp (λ s ↦ UInt256.ofUInt32 s.pc) exec
     | .JUMPDEST => do
       let exec ← charge Gjumpdest exec
       continueWith exec.incrPC
