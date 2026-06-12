@@ -63,6 +63,18 @@ extern_lib libleanffi pkg := do
   let name := nameToStaticLib "leanffi"
   buildStaticLib (pkg.staticLibDir / name) #[sha256O, keccak256, ffiO]
 
+/-- Build the rust helper binary (`tools/evmrs`) the conform runner shells out to. -/
+target evmrs pkg : FilePath := do
+  let exe := pkg.dir / "tools" / "evmrs" / "target" / "release" / "evmrs"
+  if !(← exe.pathExists) then
+    dbg_trace "Building rust helper: cargo build --release (tools/evmrs)"
+    let out ← IO.Process.output {
+      cmd := "cargo", args := #["build", "--release"], cwd := pkg.dir / "tools" / "evmrs"
+    }
+    if out.exitCode != 0 then
+      error s!"evmrs cargo build failed: {out.stderr}"
+  return pure exe
+
 lean_lib «Conform»
 
 @[default_target]
@@ -71,6 +83,7 @@ lean_lib «EvmYul»
 @[test_driver]
 lean_exe «conform» where
   root := `Conform.Main
+  extraDepTargets := #[`evmrs]
 
 lean_exe «yulSemanticsTests» where
   root := `EvmYul.Yul.YulSemanticsTests.Main

@@ -12,8 +12,8 @@ def blobECDSARECOVER (e v r s : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput e v r s
   where pythonCommandOfInput (e v r s : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["EvmYul/EllipticCurvesPy/recover.py", e, v, r, s]
+    cmd := evmrsExe,
+    args := #["recover", e, v, r, s]
   }
 
 def blobSign (e pᵣ : String) : List String :=

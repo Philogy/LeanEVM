@@ -1,0 +1,18 @@
+[package]
+name = "evmrs"
+version = "0.1.0"
+edition = "2021"
+description = "Fast native helpers for the LeanEVM conform suite (replaces python shell-outs)"
+
+[dependencies]
+hex = "0.4"
+ripemd = "0.1"
+sha2 = "0.10"
+k256 = { version = "0.13", features = ["ecdsa"] }
+bn = { package = "substrate-bn", version = "0.6" }
+c-kzg = { version = "2.1", features = ["ethereum_kzg_settings"] }
+alloy-trie = "0.9"
+alloy-primitives = "1"
+
+[profile.release]
+lto = true

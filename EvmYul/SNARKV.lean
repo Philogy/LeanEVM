@@ -7,8 +7,8 @@ def blobSNARKV (data : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput data
   where pythonCommandOfInput (data : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["EvmYul/EllipticCurvesPy/snarkv.py", data]
+    cmd := evmrsExe,
+    args := #["snarkv", data]
   }
 
 def SNARKV (data : ByteArray) : Except String ByteArray :=

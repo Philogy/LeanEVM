@@ -21,10 +21,6 @@ def blobComputeTrieRoot (ws : Array (String × String)) : String :=
     pure result
  where
   pythonCommandOfInput (inputFile : String) (ws : Array (String × String)) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args :=
-      #["EvmYul/EllipticCurvesPy/trie_root.py"]
-        ++ #[inputFile]
-        ++ #[ws.size.repr]
-        -- ++ (ws.map (λ (i, w) ↦ #[i, w])).join
+    cmd := evmrsExe,
+    args := #["trie-root", inputFile, ws.size.repr]
   }

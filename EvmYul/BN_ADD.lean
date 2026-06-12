@@ -7,8 +7,8 @@ def blobBN_ADD (x₀ y₀ x₁ y₁ : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput x₀ y₀ x₁ y₁
   where pythonCommandOfInput (x₀ y₀ x₁ y₁ : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["EvmYul/EllipticCurvesPy/bn_add.py", x₀, y₀, x₁, y₁]
+    cmd := evmrsExe,
+    args := #["bn-add", x₀, y₀, x₁, y₁]
   }
 
 def BN_ADD (x₀ y₀ x₁ y₁ : ByteArray) : Except String ByteArray :=

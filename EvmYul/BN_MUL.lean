@@ -7,8 +7,8 @@ def blobBN_MUL (x₀ y₀ n : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput x₀ y₀ n
   where pythonCommandOfInput (x₀ y₀ n : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["EvmYul/EllipticCurvesPy/bn_mul.py", x₀, y₀, n]
+    cmd := evmrsExe,
+    args := #["bn-mul", x₀, y₀, n]
   }
 
 def BN_MUL (x₀ y₀ n : ByteArray) : Except String ByteArray :=

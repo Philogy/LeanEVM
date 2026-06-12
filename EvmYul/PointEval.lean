@@ -7,8 +7,8 @@ def blobPointEval (data : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
     pythonCommandOfInput data
   where pythonCommandOfInput (data : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["EvmYul/EllipticCurvesPy/point_evaluation.py", data]
+    cmd := evmrsExe,
+    args := #["point-eval", data]
   }
 
 def PointEval (data : ByteArray) : Except String ByteArray :=
