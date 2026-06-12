@@ -104,6 +104,7 @@ def testFiles (root               : System.FilePath)
       (v, v)
     if ts % 500 == 0 ∧ ts != 0 then
       IO.println s!"[{ts} tests done, {fl} failed, {xf} xfail]"
+      (← IO.getStdout).flush
     pure r
 
   IO.println s!"Scheduling {testFiles.size} test files for parallel execution..."

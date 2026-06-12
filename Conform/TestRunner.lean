@@ -288,9 +288,7 @@ def validateTransaction
   let (senderCode, senderNonce, senderBalance) :=
     match σ.find? S_T with
       | some sender => (sender.code, sender.nonce, sender.balance)
-      | none =>
-        dbg_trace s!"could not find sender {Evm.toHex S_T.toByteArray}"
-        (.empty, 0, 0)
+      | none => (.empty, 0, 0)
 
   if senderCode ≠ .empty then throw <| .TransactionException .SENDER_NOT_EOA
   if T.base.nonce < senderNonce then
