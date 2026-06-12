@@ -5,6 +5,13 @@ import Evm.FFI.ffi
 -- (195)
 def BE : ℕ → ByteArray := List.toByteArray ∘ Evm.toBytesBigEndian
 
+def hexOfByte (byte : UInt8) : String :=
+  hexDigitRepr (byte.toNat >>> 4 &&& 0b00001111) ++
+  hexDigitRepr (byte.toNat &&& 0b00001111)
+
+def toHex (bytes : ByteArray) : String :=
+  bytes.foldl (init := "") λ acc byte ↦ acc ++ hexOfByte byte
+
 namespace Evm
 
 def chainId : ℕ := 1
@@ -39,13 +46,6 @@ def toByteArray (a : AccountAddress) : ByteArray :=
   ffi.ByteArray.zeroes ⟨20 - b.size⟩ ++ b
 
 end AccountAddress
-
-def hexOfByte (byte : UInt8) : String :=
-  hexDigitRepr (byte.toNat >>> 4 &&& 0b00001111) ++
-  hexDigitRepr (byte.toNat &&& 0b00001111)
-
-def toHex (bytes : ByteArray) : String :=
-  bytes.foldl (init := "") λ acc byte ↦ acc ++ hexOfByte byte
 
 instance : Repr ByteArray where
   reprPrec s _ := toHex s
@@ -112,13 +112,6 @@ partial def Nat.toHex (n : Nat) : String :=
   if n < 16
   then hexDigitRepr n
   else (toHex (n / 16)) ++ hexDigitRepr (n % 16)
-
-def hexOfByte (byte : UInt8) : String :=
-  hexDigitRepr (byte.toNat >>> 4 &&& 0b00001111) ++
-  hexDigitRepr (byte.toNat &&& 0b00001111)
-
-def toHex (bytes : ByteArray) : String :=
-  bytes.foldl (init := "") λ acc byte ↦ acc ++ hexOfByte byte
 
 /-- Add `0`s to make the hex representation valid for `ByteArray.ofBlob` -/
 def padLeft (n : ℕ) (s : String) :=

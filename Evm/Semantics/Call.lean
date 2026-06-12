@@ -17,26 +17,26 @@ Returns `.inl frame` when EVM code must run (the driver descends into it) or
 `.inr result` when the call completes without code execution (precompiles).
 -/
 def beginCall (params : CallParams) : Frame ⊕ CallResult :=
-  let σ := params.accounts
+  let accounts := params.accounts
   -- (124) (125) (126)
-  let σ'₁ :=
-    match σ.find? params.recipient with
+  let accountsAfterCredit :=
+    match accounts.find? params.recipient with
       | none =>
         if params.value != (0 : UInt256) then
-          σ.insert params.recipient { (default : Account) with balance := params.value }
+          accounts.insert params.recipient { (default : Account) with balance := params.value }
         else
-          σ
+          accounts
       | some acc =>
-        σ.insert params.recipient { acc with balance := acc.balance + params.value }
+        accounts.insert params.recipient { acc with balance := acc.balance + params.value }
 
   -- If `v` ≠ 0 then the sender must have passed the `INSUFFICIENT_ACCOUNT_FUNDS` check
-  let σ₁ :=
-    match σ'₁.find? params.caller with
-      | none => σ'₁
+  let accountsAfterTransfer :=
+    match accountsAfterCredit.find? params.caller with
+      | none => accountsAfterCredit
       | some acc =>
-        σ'₁.insert params.caller { acc with balance := acc.balance - params.value }
+        accountsAfterCredit.insert params.caller { acc with balance := acc.balance - params.value }
 
-  let I : ExecutionEnv :=
+  let env : ExecutionEnv :=
     {
       address := params.recipient        -- Equation (132)
       origin    := params.origin           -- Equation (133)
@@ -57,37 +57,37 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
 
   match params.codeSource with
     | ToExecute.Precompiled p =>
-      let (z, σ'', g', A'', out) :=
+      let (success, accounts'', gasRemaining, substate'', output) :=
         match p with
-          | 1  => Precompiles.ecRecover        σ₁ params.gas params.substate I
-          | 2  => Precompiles.sha256           σ₁ params.gas params.substate I
-          | 3  => Precompiles.ripemd160        σ₁ params.gas params.substate I
-          | 4  => Precompiles.identity         σ₁ params.gas params.substate I
-          | 5  => Precompiles.modExp           σ₁ params.gas params.substate I
-          | 6  => Precompiles.ecAdd            σ₁ params.gas params.substate I
-          | 7  => Precompiles.ecMul            σ₁ params.gas params.substate I
-          | 8  => Precompiles.ecPairing        σ₁ params.gas params.substate I
-          | 9  => Precompiles.blake2f          σ₁ params.gas params.substate I
-          | 10 => Precompiles.pointEvaluation  σ₁ params.gas params.substate I
+          | 1  => Precompiles.ecRecover        accountsAfterTransfer params.gas params.substate env
+          | 2  => Precompiles.sha256           accountsAfterTransfer params.gas params.substate env
+          | 3  => Precompiles.ripemd160        accountsAfterTransfer params.gas params.substate env
+          | 4  => Precompiles.identity         accountsAfterTransfer params.gas params.substate env
+          | 5  => Precompiles.modExp           accountsAfterTransfer params.gas params.substate env
+          | 6  => Precompiles.ecAdd            accountsAfterTransfer params.gas params.substate env
+          | 7  => Precompiles.ecMul            accountsAfterTransfer params.gas params.substate env
+          | 8  => Precompiles.ecPairing        accountsAfterTransfer params.gas params.substate env
+          | 9  => Precompiles.blake2f          accountsAfterTransfer params.gas params.substate env
+          | 10 => Precompiles.pointEvaluation  accountsAfterTransfer params.gas params.substate env
           | _  => (false, ∅, 0, params.substate, .empty) -- unreachable: `toExecute` yields 1–10 only
       .inr
         -- NB the precompile path historically clears `createdAccounts`; kept verbatim.
         { createdAccounts := ∅
           -- Equations (127) and (129): an empty post-map signals failure — roll back.
-          accounts := if σ'' == ∅ then σ else σ''
-          gasRemaining := g'
-          substate := if σ'' == ∅ then params.substate else A''
-          success := z
-          output := out }
+          accounts := if accounts'' == ∅ then accounts else accounts''
+          gasRemaining := gasRemaining
+          substate := if accounts'' == ∅ then params.substate else substate''
+          success := success
+          output := output }
     | ToExecute.Code _ =>
       .inl
-        { kind := .call ⟨params.createdAccounts, σ, params.substate⟩
-          validJumps := validJumpDests I.code 0
+        { kind := .call ⟨params.createdAccounts, accounts, params.substate⟩
+          validJumps := validJumpDests env.code 0
           exec :=
             { (default : ExecutionState) with
-                accounts := σ₁
+                accounts := accountsAfterTransfer
                 originalAccounts := params.originalAccounts
-                executionEnv := I
+                executionEnv := env
                 substate := params.substate
                 createdAccounts := params.createdAccounts
                 gasAvailable := params.gas
@@ -101,12 +101,12 @@ into the call's result, rolling back to the checkpoint on failure
 -/
 def endCall (checkpoint : Checkpoint) : FrameHalt → CallResult
   | .success exec output =>
-    let σ'' := exec.accounts
+    let accounts'' := exec.accounts
     { createdAccounts := exec.createdAccounts
       -- Equations (127) and (129)
-      accounts := if σ'' == ∅ then checkpoint.accounts else σ''
+      accounts := if accounts'' == ∅ then checkpoint.accounts else accounts''
       gasRemaining := exec.gasAvailable
-      substate := if σ'' == ∅ then checkpoint.substate else exec.substate
+      substate := if accounts'' == ∅ then checkpoint.substate else exec.substate
       success := true
       output := output }
   | .revert gasRemaining output =>
@@ -131,12 +131,12 @@ pc. This is the post-`Θ` tail of the CALL instructions.
 -/
 def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
   let evmState := pd.frame.exec
-  let o := result.output
-  -- n ≡ min({μs[6], ‖o‖})
-  let n : UInt256 := min pd.outSize (.ofNat o.size)
-  -- μ′_m[μs[5] ... (μs[5] + n − 1)] = o[0 ... (n − 1)]
-  let μ'ₘ := writeBytes o 0 evmState.toMachineState pd.outOffset.toNat n.toNat
-  let μ'_g := μ'ₘ.gasAvailable + result.gasRemaining -- Ccall was subtracted as part of C
+  let output := result.output
+  -- outputWriteLen ≡ min({μs[6], ‖output‖})
+  let outputWriteLen : UInt256 := min pd.outSize (.ofNat output.size)
+  -- μ′_m[μs[5] ... (μs[5] + outputWriteLen − 1)] = output[0 ... (outputWriteLen − 1)]
+  let machineWithOutput := writeBytes output 0 evmState.toMachineState pd.outOffset.toNat outputWriteLen.toNat
+  let gasAfterReturn := machineWithOutput.gasAvailable + result.gasRemaining -- Ccall was subtracted as part of C
 
   let codeExecutionFailed   : Bool := !result.success
   let notEnoughFunds        : Bool :=
@@ -147,9 +147,9 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
   let x : UInt256 := if codeExecutionFailed || notEnoughFunds || callDepthLimitReached then 0 else 1
 
   let μ' : MachineState :=
-    { μ'ₘ with
-        returnData   := o -- μ′o = o
-        gasAvailable := μ'_g
+    { machineWithOutput with
+        returnData   := output -- μ′output = output
+        gasAvailable := gasAfterReturn
         activeWords :=
           let m : ℕ := MachineState.M evmState.toMachineState.activeWords.toNat pd.inOffset.toNat pd.inSize.toNat
           .ofNat <| MachineState.M m pd.outOffset.toNat pd.outSize.toNat }

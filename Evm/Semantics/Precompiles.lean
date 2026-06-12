@@ -19,19 +19,19 @@ import Evm.FFI.ffi
 namespace Evm.Precompiles
 
 def ecRecover
-  (σ : (AccountMap))
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ := 3000
+  let requiredGas : ℕ := 3000
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
-    let d := I.calldata
+    let d := env.calldata
     let h := d.readBytes 0 32
     let v := d.readBytes 32 32
     let r := d.readBytes 64 32
@@ -48,72 +48,72 @@ def ecRecover
               ffi.ByteArray.zeroes 12 ++ (ffi.KEC s).extract 12 32
           | .error e =>
             .empty
-    (true, σ, g - .ofNat gᵣ, A, o)
+    (true, accounts, gas - .ofNat requiredGas, substate, o)
 
 def sha256
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ :=
-    let l := I.calldata.size
+  let requiredGas : ℕ :=
+    let l := env.calldata.size
     let ceil := ( l + 31 ) / 32
     60 + 12 * ceil
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let o :=
-      match ffi.SHA256 I.calldata with
+      match ffi.SHA256 env.calldata with
         | .ok s => s
         | .error e =>
           .empty
-    (true, σ, g - .ofNat gᵣ, A, o)
+    (true, accounts, gas - .ofNat requiredGas, substate, o)
 
 def ripemd160
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ :=
-    let l := I.calldata.size
+  let requiredGas : ℕ :=
+    let l := env.calldata.size
     let ceil := ( l + 31 ) / 32
     600 + 120 * ceil
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let o :=
-      match RIP160 I.calldata with
+      match RIP160 env.calldata with
         | .ok s => s
         | .error e =>
           .empty
-    (true, σ, g - .ofNat gᵣ, A, o)
+    (true, accounts, gas - .ofNat requiredGas, substate, o)
 
 def identity
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ :=
-    let l := I.calldata.size
+  let requiredGas : ℕ :=
+    let l := env.calldata.size
     let ceil := ( l + 31 ) / 32
     15 + 3 * ceil
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
-    let o := I.calldata
-    (true, σ, g - .ofNat gᵣ, A, o)
+    let o := env.calldata
+    (true, accounts, gas - .ofNat requiredGas, substate, o)
 
 def nat_of_slice
   (B: ByteArray)
@@ -135,14 +135,14 @@ def expModAux (m : ℕ) (a : ℕ) (c : ℕ) : ℕ → ℕ
 def expMod (m : ℕ) (b : UInt256) (n : ℕ) : ℕ := expModAux m 1 b.toNat n
 
 def modExp
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let data := I.calldata
+  let data := env.calldata
   let base_length := nat_of_slice data 0 32
   let exp_length := nat_of_slice data 32 32
   let modulus_length := nat_of_slice data 64 32
@@ -150,7 +150,7 @@ def modExp
   -- We don't want to call `nat_of_slice` unless we need it
   let exp := λ () ↦ nat_of_slice data (96 + base_length) exp_length
 
-  let gᵣ :=
+  let requiredGas :=
     let multiplication_complexity x y := ((max x y + 7) / 8) ^ 2
     let adjusted_exp_length :=
       if exp_length ≤ 32 && exp () == 0 then
@@ -172,8 +172,8 @@ def modExp
 
     max 200 (multiplication_complexity base_length modulus_length * iterations / G_quaddivisor)
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let modulus := nat_of_slice data (96 + base_length + exp_length) modulus_length
     let o : ByteArray :=
@@ -189,113 +189,113 @@ def modExp
           else
             ByteArray.empty
         expmod_zeroes ++ expmod_base
-    (true, σ, g - .ofNat gᵣ, A, o)
+    (true, accounts, gas - .ofNat requiredGas, substate, o)
 
 def ecAdd
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ := 150
+  let requiredGas : ℕ := 150
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
-    let d := I.calldata
+    let d := env.calldata
     let x := (d.readBytes 0 32, d.readBytes 32 32)
     let y := (d.readBytes 64 32, d.readBytes 96 32)
     let o := BN_ADD x.1 x.2 y.1 y.2
     match o with
-      | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
+      | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error e =>
-        -- (σ, g - gᵣ, A, .empty)
-        (false, ∅, 0, A, .empty)
+        -- (accounts, gas - requiredGas, substate, .empty)
+        (false, ∅, 0, substate, .empty)
 
 def ecMul
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let gᵣ : ℕ := 6000
+  let requiredGas : ℕ := 6000
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
-    let d := I.calldata
+    let d := env.calldata
     let x := (d.readBytes 0 32, d.readBytes 32 32)
     let n := d.readBytes 64 32
     let o := BN_MUL x.1 x.2 n
     match o with
-      | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
+      | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error e =>
-        -- (σ, g - gᵣ, A, .empty)
-        (false, ∅, 0, A, .empty)
+        -- (accounts, gas - requiredGas, substate, .empty)
+        (false, ∅, 0, substate, .empty)
 
 def ecPairing
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let d := I.calldata
+  let d := env.calldata
   let k := d.size / 192
-  let gᵣ : ℕ := 34000 * k + 45000
+  let requiredGas : ℕ := 34000 * k + 45000
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let o := SNARKV d
     match o with
-      | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
+      | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error e =>
-        (false, ∅, 0, A, .empty)
+        (false, ∅, 0, substate, .empty)
 
 def blake2f
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let d := I.calldata
-  let gᵣ : ℕ := fromByteArrayBigEndian (d.extract 0 4)
+  let d := env.calldata
+  let requiredGas : ℕ := fromByteArrayBigEndian (d.extract 0 4)
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let o := ffi.BLAKE2 d
     match o with
-      | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
+      | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error e =>
-        (false, ∅, 0, A, .empty)
+        (false, ∅, 0, substate, .empty)
 
 def pointEvaluation
-  (σ : AccountMap)
-  (g : UInt256)
-  (A : Substate)
-  (I : ExecutionEnv)
+  (accounts : AccountMap)
+  (gas : UInt256)
+  (substate : Substate)
+  (env : ExecutionEnv)
     :
   (Bool × AccountMap × UInt256 × Substate × ByteArray)
 :=
-  let d := I.calldata
-  let gᵣ : ℕ := 50000
+  let d := env.calldata
+  let requiredGas : ℕ := 50000
 
-  if g.toNat < gᵣ then
-    (false, ∅, 0, A, .empty)
+  if gas.toNat < requiredGas then
+    (false, ∅, 0, substate, .empty)
   else
     let o := PointEval d
     match o with
-      | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
+      | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error e =>
-        (false, ∅, 0, A, .empty)
+        (false, ∅, 0, substate, .empty)
 
 end Evm.Precompiles

@@ -31,14 +31,14 @@ The `Account` data. Section 4.1.
 
 Suppose `a` is some address.
 
-- `nonce`    -- σ[a]ₙ.
-- `balance`  -- σ[a]_b.
+- `nonce`    -- accounts[a]ₙ.
+- `balance`  -- accounts[a]_b.
 
 In the yellow paper it is supposed to be a 256-bit hash of the root node of
 a Merkle Tree. KEVM implemets it as just an key/value map.
-- `storage`  -- σ[a]_s.
+- `storage`  -- accounts[a]_s.
 - `tstorage` -- Transiont storage; added in EIP-1153
-- `codeHash` -- σ[a]_c.
+- `codeHash` -- accounts[a]_c.
 
 For now, we assume no global map `GM` with which `GM[code_hash] ≡ code`.
 - `code`

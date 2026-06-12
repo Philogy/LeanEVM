@@ -160,8 +160,8 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
     | .RETURNDATACOPY =>
             λ evmState ↦
         match evmState.stack.pop3 with
-          | some ⟨stack', μ₀, μ₁, μ₂⟩ => do
-            let mState' := evmState.toMachineState.returndatacopy μ₀ μ₁ μ₂
+          | some ⟨stack', a, b, c⟩ => do
+            let mState' := evmState.toMachineState.returndatacopy a b c
             let evmState' := {evmState with toMachineState := mState'}
             .ok <| evmState'.replaceStackAndIncrPC stack'
           | _ => .error .StackUnderflow
@@ -190,8 +190,8 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
 
     | .MLOAD => λ evmState ↦
       match evmState.stack.pop with
-        | some ⟨ s , μ₀ ⟩ => Id.run do
-          let (v, mState') := evmState.toMachineState.mload μ₀
+        | some ⟨ s , a ⟩ => Id.run do
+          let (v, mState') := evmState.toMachineState.mload a
           let evmState' := {evmState with toMachineState := mState'}
           .ok <| evmState'.replaceStackAndIncrPC (s.push v)
         | _ => .error .StackUnderflow
@@ -219,72 +219,72 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
     | .SELFDESTRUCT =>
       λ evmState ↦
         match evmState.stack.pop with
-          | some ⟨ s , μ₁ ⟩ =>
-            let Iₐ := evmState.executionEnv.address
-            let r : AccountAddress := AccountAddress.ofUInt256 μ₁
-            if evmState.createdAccounts.contains Iₐ then
+          | some ⟨ s , b ⟩ =>
+            let self := evmState.executionEnv.address
+            let r : AccountAddress := AccountAddress.ofUInt256 b
+            if evmState.createdAccounts.contains self then
               -- When `SELFDESTRUCT` is executed in the same transaction as the contract was created
-              let A' : Substate :=
+              let substate' : Substate :=
                 { evmState.substate with
                     selfDestructSet :=
-                      evmState.substate.selfDestructSet.insert Iₐ
+                      evmState.substate.selfDestructSet.insert self
                     accessedAccounts :=
                       evmState.substate.accessedAccounts.insert r
                 }
               let accountMap' :=
-                match evmState.lookupAccount Iₐ with
+                match evmState.lookupAccount self with
                   | none =>
                     dbg_trace "No 'self' found to be destructed; this should probably not be happening;"; evmState.accounts
-                  | some σ_Iₐ  =>
+                  | some selfAccount  =>
                     match evmState.lookupAccount r with
                       | none =>
-                        if σ_Iₐ.balance == 0 then
+                        if selfAccount.balance == 0 then
                           evmState.accounts
                         else
                           evmState.accounts.insert r
-                            {(default : Account) with balance := σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := 0}
-                      | some σ_r =>
-                        if r ≠ Iₐ then
+                            {(default : Account) with balance := selfAccount.balance}
+                              |>.insert self {selfAccount with balance := 0}
+                      | some recipientAccount =>
+                        if r ≠ self then
                           evmState.accounts.insert r
-                            {σ_r with balance := σ_r.balance + σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := 0}
+                            {recipientAccount with balance := recipientAccount.balance + selfAccount.balance}
+                              |>.insert self {selfAccount with balance := 0}
                         else
                           -- if the target is the same as the contract calling `SELFDESTRUCT` that Ether will be burnt.
-                          evmState.accounts.insert r {σ_r with balance := 0}
-                            |>.insert Iₐ {σ_Iₐ with balance := 0}
+                          evmState.accounts.insert r {recipientAccount with balance := 0}
+                            |>.insert self {selfAccount with balance := 0}
               let evmState' :=
                 {evmState with
                   accounts := accountMap'
-                  substate := A'
+                  substate := substate'
                 }
               .ok <| evmState'.replaceStackAndIncrPC s
             else
               /- When SELFDESTRUCT is executed in a transaction that is not the
                 same as the contract calling SELFDESTRUCT was created:
               -/
-              let A' : Substate :=
+              let substate' : Substate :=
                 { evmState.substate with
                     accessedAccounts :=
                       evmState.substate.accessedAccounts.insert r
                 }
               let accountMap' :=
-                match evmState.lookupAccount Iₐ with
+                match evmState.lookupAccount self with
                   | none => dbg_trace "No 'self' found to be destructed; this should probably not be happening;"; evmState.accounts
-                  | some σ_Iₐ  =>
+                  | some selfAccount  =>
                     match evmState.lookupAccount r with
                       | none =>
-                        if σ_Iₐ.balance == 0 then
+                        if selfAccount.balance == 0 then
                           evmState.accounts
                         else
                           evmState.accounts.insert r
-                            {(default : Account) with balance := σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := 0}
-                      | some σ_r =>
-                        if r ≠ Iₐ then
+                            {(default : Account) with balance := selfAccount.balance}
+                              |>.insert self {selfAccount with balance := 0}
+                      | some recipientAccount =>
+                        if r ≠ self then
                           evmState.accounts.insert r
-                            {σ_r with balance := σ_r.balance + σ_Iₐ.balance}
-                              |>.insert Iₐ {σ_Iₐ with balance := 0}
+                            {recipientAccount with balance := recipientAccount.balance + selfAccount.balance}
+                              |>.insert self {selfAccount with balance := 0}
                         else
                           -- Note that if the target is the same as the contract
                           -- calling SELFDESTRUCT there is no net change in balances.
@@ -293,7 +293,7 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
               let evmState' :=
                 {evmState with
                   accounts := accountMap'
-                  substate := A'
+                  substate := substate'
                 }
               .ok <| evmState'.replaceStackAndIncrPC s
           | _ => .error .StackUnderflow
@@ -306,14 +306,14 @@ def stepPrimop (op : Operation) (arg : Option (UInt256 × Nat) := .none) : Trans
         .ok <| evmState.replaceStackAndIncrPC (evmState.stack.push arg) (pcΔ := argWidth.succ)
     | .JUMP => λ evmState => do
         match evmState.stack.pop with
-          | some ⟨stack , μ₀⟩ =>
-            let newPc := μ₀
+          | some ⟨stack , a⟩ =>
+            let newPc := a
             .ok <| {evmState with pc := newPc, stack := stack}
           | _ => .error .StackUnderflow
     | .JUMPI => λ evmState => do
         match evmState.stack.pop2 with
-          | some ⟨stack , μ₀, μ₁⟩ =>
-            let newPc := if μ₁ != 0 then μ₀ else evmState.pc + 1
+          | some ⟨stack , a, b⟩ =>
+            let newPc := if b != 0 then a else evmState.pc + 1
             .ok <| {evmState with pc := newPc, stack := stack}
           | _ => .error .StackUnderflow
     | .PC => λ evmState =>

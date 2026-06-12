@@ -40,7 +40,7 @@ end Withdrawal
 def Withdrawal.toBlobs (w : ℕ × ByteArray) : Option (String × String) := do
   let rlpᵢ ← Rlp.encode (.bytes (BE w.1))
   let rlp ← w.2
-  pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
+  pure (toHex rlpᵢ, toHex rlp)
 
 -- EIP-4895
 def Withdrawal.computeTrieRoot (ws : Array ByteArray) : Option ByteArray := do
@@ -49,17 +49,17 @@ def Withdrawal.computeTrieRoot (ws : Array ByteArray) : Option ByteArray := do
     | some ws => (ByteArray.ofBlob (blobComputeTrieRoot ws)).toOption
 
 def applyWithdrawals
-  (σ : AccountMap)
+  (accounts : AccountMap)
   (ws : Array Withdrawal)
     :
   AccountMap
 :=
-  ws.foldl applyWithdrawal σ
+  ws.foldl applyWithdrawal accounts
  where
-  applyWithdrawal (σ : AccountMap) (w : Withdrawal) : AccountMap :=
-    if w.amount <= 0 then σ else
-      match σ.find? w.address with
+  applyWithdrawal (accounts : AccountMap) (w : Withdrawal) : AccountMap :=
+    if w.amount <= 0 then accounts else
+      match accounts.find? w.address with
         | none =>
-          σ.insert w.address {(default : Account) with balance := .ofNat <| w.amount.toFin.val * 10^9}
+          accounts.insert w.address {(default : Account) with balance := .ofNat <| w.amount.toFin.val * 10^9}
         | some ac =>
-          σ.insert w.address {ac with balance := .ofNat <| ac.balance.toNat + w.amount.toFin.val * 10^9}
+          accounts.insert w.address {ac with balance := .ofNat <| ac.balance.toNat + w.amount.toFin.val * 10^9}

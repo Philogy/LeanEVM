@@ -37,40 +37,40 @@ abbrev PersistentAccountMap := AddrMap (PersistentAccountState)
 def AccountMap.toPersistentAccountMap (a : AccountMap) : PersistentAccountMap :=
   a.mapVal (λ _ acc ↦ acc.toPersistentAccountState)
 
-def AccountMap.increaseBalance (σ : AccountMap) (addr : AccountAddress) (amount : UInt256)
+def AccountMap.increaseBalance (accounts : AccountMap) (addr : AccountAddress) (amount : UInt256)
   : AccountMap
 :=
-  match σ.find? addr with
-    | none => σ.insert addr {(default : Account) with balance := amount}
-    | some acc => σ.insert addr {acc with balance := acc.balance + amount}
+  match accounts.find? addr with
+    | none => accounts.insert addr {(default : Account) with balance := amount}
+    | some acc => accounts.insert addr {acc with balance := acc.balance + amount}
 
 /--
   Returns `none` in the case of an overflow below zero.
 -/
-def AccountMap.decreaseBalance (σ : AccountMap) (addr : AccountAddress) (amount : UInt256)
+def AccountMap.decreaseBalance (accounts : AccountMap) (addr : AccountAddress) (amount : UInt256)
   : Option (AccountMap)
 :=
-  match σ.find? addr with
+  match accounts.find? addr with
     | none => .none
     | some acc =>
-      if acc.balance < amount then .none else .some (σ.insert addr {acc with balance := acc.balance - amount})
+      if acc.balance < amount then .none else .some (accounts.insert addr {acc with balance := acc.balance - amount})
 
 /--
   Returns `none` in the case of an overflow below zero.
 -/
-def AccountMap.transferBalance (σ : AccountMap) (from_addr to_addr : AccountAddress) (amount : UInt256)
+def AccountMap.transferBalance (accounts : AccountMap) (from_addr to_addr : AccountAddress) (amount : UInt256)
   : Option (AccountMap)
 :=
-  match (σ.decreaseBalance from_addr amount) with
+  match (accounts.decreaseBalance from_addr amount) with
     | .none => .none
-    | .some σ' => σ'.increaseBalance to_addr amount
+    | .some accounts' => accounts'.increaseBalance to_addr amount
 
-def toExecute (σ : AccountMap) (t : AccountAddress) : ToExecute :=
+def toExecute (accounts : AccountMap) (t : AccountAddress) : ToExecute :=
   if /- t is a precompiled account -/ t ∈ precompileAddresses then
     ToExecute.Precompiled t
   else Id.run do
     -- We use the code directly without an indirection a'la `codeMap[t]`.
-    let .some tDirect := σ.find? t | ToExecute.Code default
+    let .some tDirect := accounts.find? t | ToExecute.Code default
     ToExecute.Code tDirect.code
 
 /--
@@ -78,20 +78,20 @@ The secured state trie root. The whole computation (per-account storage
 roots, account RLP, state trie) happens in a single `evmrs state-root`
 invocation — one process per root, not one per contract account.
 -/
-def stateTrieRoot (σ : PersistentAccountMap) : Option ByteArray :=
+def stateTrieRoot (accounts : PersistentAccountMap) : Option ByteArray :=
   let payload :=
-    σ.foldl (init := s!"{σ.size}\n") λ acc addr account ↦
+    accounts.foldl (init := s!"{accounts.size}\n") λ acc addr account ↦
       let storage := account.storage.1.toArray
       let storageLines :=
         storage.foldl (init := s!"{storage.size}\n") λ acc (slot, value) ↦
           acc
-            ++ Evm.toHex (ffi.KEC slot.toByteArray) ++ "\n"
-            ++ Evm.toHex ((Rlp.encode (.bytes (BE value.toNat))).get!) ++ "\n"
+            ++ toHex (ffi.KEC slot.toByteArray) ++ "\n"
+            ++ toHex ((Rlp.encode (.bytes (BE value.toNat))).get!) ++ "\n"
       acc
-        ++ Evm.toHex (ffi.KEC addr.toByteArray) ++ "\n"
-        ++ Evm.toHex (BE account.nonce.toNat) ++ "\n"
-        ++ Evm.toHex (BE account.balance.toNat) ++ "\n"
-        ++ Evm.toHex account.codeHash.toByteArray ++ "\n"
+        ++ toHex (ffi.KEC addr.toByteArray) ++ "\n"
+        ++ toHex (BE account.nonce.toNat) ++ "\n"
+        ++ toHex (BE account.balance.toNat) ++ "\n"
+        ++ toHex account.codeHash.toByteArray ++ "\n"
         ++ storageLines
   (ByteArray.ofBlob (blobComputeStateRoot payload)).toOption
 

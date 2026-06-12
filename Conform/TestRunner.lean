@@ -159,24 +159,24 @@ def validateHeaderBeforeTransactions
     blocks.findRev? λ b ↦ b.hash = header.parentHash
     | throw <| .BlockException .UNKNOWN_PARENT
 
-  let P_Hₗ := parent.blockHeader.gasLimit
+  let parentGasLimit := parent.blockHeader.gasLimit
 
-  let ρ := 2; let τ := P_Hₗ / ρ; let ε := 8
-  let νStar :=
-    if parent.blockHeader.gasUsed < τ then
-      (parent.blockHeader.baseFeePerGas * (τ - parent.blockHeader.gasUsed)) / τ
+  let elasticity := 2; let gasTarget := parentGasLimit / elasticity; let denominator := 8
+  let baseFeeDelta :=
+    if parent.blockHeader.gasUsed < gasTarget then
+      (parent.blockHeader.baseFeePerGas * (gasTarget - parent.blockHeader.gasUsed)) / gasTarget
     else
-      (parent.blockHeader.baseFeePerGas * (parent.blockHeader.gasUsed - τ)) / τ
+      (parent.blockHeader.baseFeePerGas * (parent.blockHeader.gasUsed - gasTarget)) / gasTarget
   let ν :=
-    if parent.blockHeader.gasUsed < τ then νStar / ε else max (νStar / ε) 1
+    if parent.blockHeader.gasUsed < gasTarget then baseFeeDelta / denominator else max (baseFeeDelta / denominator) 1
   let expectedBaseFeePerGas :=
-    if parent.blockHeader.gasUsed = τ then parent.blockHeader.baseFeePerGas else
-    if parent.blockHeader.gasUsed < τ then parent.blockHeader.baseFeePerGas - ν else
+    if parent.blockHeader.gasUsed = gasTarget then parent.blockHeader.baseFeePerGas else
+    if parent.blockHeader.gasUsed < gasTarget then parent.blockHeader.baseFeePerGas - ν else
       parent.blockHeader.baseFeePerGas + ν
   if
     header.gasLimit < 5000
-      ∨ header.gasLimit ≥ P_Hₗ + P_Hₗ / 1024
-      ∨ header.gasLimit ≤ P_Hₗ - P_Hₗ / 1024
+      ∨ header.gasLimit ≥ parentGasLimit + parentGasLimit / 1024
+      ∨ header.gasLimit ≤ parentGasLimit - parentGasLimit / 1024
   then
     throw <| .BlockException .INVALID_GASLIMIT
   if header.baseFeePerGas ≠ expectedBaseFeePerGas then
@@ -186,7 +186,7 @@ def validateHeaderBeforeTransactions
   pure parent
 
 def validateTransaction
-  (σ : AccountMap)
+  (accounts : AccountMap)
   (chainId : ℕ)
   (header : BlockHeader)
   (totalGasUsedInBlock : ℕ)
@@ -266,7 +266,7 @@ def validateTransaction
       | .legacy _ => ffi.KEC T_RLP
       | _ => ffi.KEC <| ByteArray.mk #[T.type] ++ T_RLP
 
-  let (S_T : AccountAddress) ← -- (323)
+  let (sender : AccountAddress) ← -- (323)
     -- Fixture-provided sender (when present) replaces the evmrs-backed ECDSA
     -- recovery; the v/r/s validity checks above still run either way.
     match senderHint with
@@ -280,7 +280,7 @@ def validateTransaction
 
   -- "Also, with a slight abuse of notation ... "
   let (senderCode, senderNonce, senderBalance) :=
-    match σ.find? S_T with
+    match accounts.find? sender with
       | some sender => (sender.code, sender.nonce, sender.balance)
       | none => (.empty, 0, 0)
 
@@ -304,7 +304,7 @@ def validateTransaction
   if v₀ > senderBalance then
     throw <| .TransactionException .INSUFFICIENT_ACCOUNT_FUNDS
 
-  pure S_T
+  pure sender
 
  where
   txSigningData (T : Transaction) : Except Evm.Exception Rlp := -- (317)
@@ -491,7 +491,7 @@ def processBlocks
           let block ← deserializeRawBlock rawBlock
           let parent ←
             validateHeaderBeforeTransactions accState.blocks block.blockHeader
-          let accState ← processBlock {accState with accounts := parent.σ} block
+          let accState ← processBlock {accState with accounts := parent.accounts} block
           validateBlock accState parent.blockHeader block
           if ¬block.exception.isEmpty then
             throw <| .MissedExpectedException block.exception
@@ -550,18 +550,18 @@ def processBlocks
                 depth := 0
                 blockHeader := block.blockHeader
                 canModifyState := true }
-          let σ ←
+          let accounts ←
             match beaconCallResult with
               | .ok r /- can't fail -/ => pure r.accounts
               | .error e => throw <| .ExecutionException e
-          let s := {s₀ with accounts := σ}
+          let s := {s₀ with accounts := accounts}
           pure s
 
     -- Transactions execution
     let s ←
       block.transactions.array.zipIdx.foldlM
         (λ s' (tx, i) ↦ do
-          let S_T ←
+          let sender ←
             validateTransaction
               s'.accounts
               chainId
@@ -569,14 +569,14 @@ def processBlocks
               s'.totalGasUsedInBlock
               tx
               (senderHint := (block.senders.getD i none))
-          applyTransaction tx S_T s' block.blockHeader
+          applyTransaction tx sender s' block.blockHeader
         )
         {s with totalGasUsedInBlock := 0, transactionReceipts := .empty}
 
     -- Withdrawals execution
-    let σ := applyWithdrawals s.accounts block.withdrawals.array
+    let accounts := applyWithdrawals s.accounts block.withdrawals.array
 
-    pure { s with accounts := σ }
+    pure { s with accounts := accounts }
 
 /--
 - `.none` on success
@@ -590,7 +590,7 @@ def preImpliesPost (entry : TestEntry)
     let resultState ← processBlocks entry.pre entry.blocks entry.genesisRLP
     let lastAccountMap :=
       resultState.blocks.findRev? (·.hash == entry.lastblockhash)
-      |>.option resultState.accounts ProcessedBlock.σ
+      |>.option resultState.accounts ProcessedBlock.accounts
     let result : PersistentAccountMap :=
       lastAccountMap.foldl
         (λ r addr ⟨⟨nonce, balance, storage, code⟩, _, _⟩ ↦ r.insert addr ⟨nonce, balance, storage, code⟩) default
@@ -613,7 +613,7 @@ instance (priority := high) : Repr (PersistentAccountMap) := ⟨λ m _ ↦
   Id.run do
     let mut result := ""
     for (k, v) in m do
-      result := result ++ s!"\nAccount[...{(Evm.toHex k.toByteArray) /-|>.takeRight 5-/}]\n"
+      result := result ++ s!"\nAccount[...{(toHex k.toByteArray) /-|>.takeRight 5-/}]\n"
       result := result ++ s!"balance: {v.balance}\nnonce: {v.nonce}\nstorage: \n"
       for (sk, sv) in v.storage do
         result := result ++ s!"{sk} → {sv}\n"
@@ -632,13 +632,13 @@ def processTest (entry : TestEntry) (isTimed : Option (Nat × TestId) := .none) 
     | .error err => .mkFailed s!"{repr err}"
     | .ok result => errorF <$> result
   where discardError : PersistentAccountMap → String := λ _ ↦ "ERROR."
-        verboseError : PersistentAccountMap → String := λ σ ↦
+        verboseError : PersistentAccountMap → String := λ accounts ↦
           match entry.postState with
             | .Map post =>
-              let (postSubActual, actualSubPost) := storageΔ post σ
+              let (postSubActual, actualSubPost) := storageΔ post accounts
               s!"\npost / actual: {repr postSubActual} \nactual / post: {repr actualSubPost}"
             | .Hash h =>
-              s!"\npost: {Evm.toHex h} \nactual: {Evm.toHex <$> stateTrieRoot σ}"
+              s!"\npost: {toHex h} \nactual: {toHex <$> stateTrieRoot accounts}"
         errorF := if verbose then verboseError else discardError
 
 /--

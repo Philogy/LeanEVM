@@ -35,23 +35,23 @@ with the definition of `C_<>` functions that are described inline along with the
 It would be worth restructing everything to obtain cleaner separation of concerns.
 -/
 def sstoreCost (s : ExecutionState) : ℕ :=
-  let { stack := μₛ, accounts := σ, originalAccounts := σ₀, executionEnv.address := Iₐ, .. } := s
-  let { storage := σ_Iₐ, .. } := σ.find! Iₐ
-  let storeAddr := μₛ[0]!
-  let v₀ :=
-    match σ₀.find? Iₐ with
+  let { stack := stack, accounts := accounts, originalAccounts := originalAccounts, executionEnv.address := self, .. } := s
+  let { storage := selfStorage, .. } := accounts.find! self
+  let storeAddr := stack[0]!
+  let originalValue :=
+    match originalAccounts.find? self with
       | none => 0
       | some acc => acc.storage.findD storeAddr 0
-  let v := σ_Iₐ.findD storeAddr 0
-  let v' := μₛ[1]!
+  let currentValue := selfStorage.findD storeAddr 0
+  let currentValue' := stack[1]!
   let loadComponent :=
-    if s.substate.accessedStorageKeys.contains (Iₐ, storeAddr) then
+    if s.substate.accessedStorageKeys.contains (self, storeAddr) then
       0
     else
       Gcoldsload
-  let storeComponent := if v = v' || v₀ ≠ v             then Gwarmaccess else
-                        if v ≠ v' && v₀ = v && v₀ = 0 then Gsset else
-                        /- v ≠ v' ∧ v₀ = v ∧ v₀ ≠ 0 -/     Gsreset
+  let storeComponent := if currentValue = currentValue' || originalValue ≠ currentValue             then Gwarmaccess else
+                        if currentValue ≠ currentValue' && originalValue = currentValue && originalValue = 0 then Gsset else
+                        /- currentValue ≠ currentValue' ∧ originalValue = currentValue ∧ originalValue ≠ 0 -/     Gsreset
   loadComponent + storeComponent
 
 def tstoreCost : ℕ :=
@@ -62,24 +62,24 @@ def tstoreCost : ℕ :=
 /--
 (328)
 -/
-def accessCost (a : AccountAddress) (A : Substate) : ℕ :=
-  if A.accessedAccounts.contains a
+def accessCost (a : AccountAddress) (substate : Substate) : ℕ :=
+  if substate.accessedAccounts.contains a
   then Gwarmaccess
   else Gcoldaccountaccess
 
 /--
 CHECK -
-In YP we have `selfdestructCost(σ, μ)`; if we were to compute `Aₐ` that we need, we would need an
-address in `σ` - is this address supposed to be obvious?
+In YP we have `Cselfdestruct(σ, μ)`; if we were to compute the accessed-accounts set it needs, we would need an
+address in `accounts` - is this address supposed to be obvious?
 CURRENT SOLUTION -
 We take `ExecutionState`.
 -/
 def selfdestructCost (s : ExecutionState) : ℕ :=
   let r := AccountAddress.ofUInt256 s.stack[0]!
-  let { substate.accessedAccounts := Aₐ, accounts := σ, executionEnv.address := Iₐ, .. } := s
-  let c_cold := if Aₐ.contains r then 0 else Gcoldaccountaccess
+  let { substate.accessedAccounts := accessedAccounts, accounts := accounts, executionEnv.address := self, .. } := s
+  let c_cold := if accessedAccounts.contains r then 0 else Gcoldaccountaccess
   let c_new :=
-    if Evm.State.dead σ r ∧ (σ.find? Iₐ |>.option 0 (·.balance)) ≠ 0 then
+    if Evm.State.dead accounts r ∧ (accounts.find? self |>.option 0 (·.balance)) ≠ 0 then
       Gnewaccount
     else 0
   Gselfdestruct + c_cold + c_new
@@ -87,8 +87,8 @@ def selfdestructCost (s : ExecutionState) : ℕ :=
 /--
 NB Assumes stack coherency.
 -/
-def sloadCost (μₛ : Stack UInt256) (A : Substate) (I : ExecutionEnv) : ℕ :=
-  if A.accessedStorageKeys.contains (I.address, μₛ[0]!)
+def sloadCost (stack : Stack UInt256) (substate : Substate) (env : ExecutionEnv) : ℕ :=
+  if substate.accessedStorageKeys.contains (env.address, stack[0]!)
   then Gwarmaccess
   else Gcoldsload
 
@@ -100,31 +100,31 @@ def tloadCost : ℕ :=
 -/
 def allButOneSixtyFourth (n : ℕ) : ℕ := n - (n / 64)
 
-def newAccountCost (t : AccountAddress) (val : UInt256) (σ : AccountMap) : ℕ :=
-  if Evm.State.dead σ t && val != 0 then Gnewaccount else 0
+def newAccountCost (t : AccountAddress) (val : UInt256) (accounts : AccountMap) : ℕ :=
+  if Evm.State.dead accounts t && val != 0 then Gnewaccount else 0
 
 def transferCost (val : UInt256) : ℕ :=
   if val != 0 then Gcallvalue else 0
 
-def callExtraCost (t r : AccountAddress) (val : UInt256) (σ : AccountMap) (A : Substate) : ℕ :=
-  accessCost t A + transferCost val + newAccountCost r val σ
+def callExtraCost (t r : AccountAddress) (val : UInt256) (accounts : AccountMap) (substate : Substate) : ℕ :=
+  accessCost t substate + transferCost val + newAccountCost r val accounts
 
-def callGasCap (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) :=
-  if μ.gasAvailable.toNat >= callExtraCost t r val σ A then
-    min (allButOneSixtyFourth <| (μ.gasAvailable.toNat - callExtraCost t r val σ A)) g.toNat
+def callGasCap (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (machine : MachineState) (substate : Substate) :=
+  if machine.gasAvailable.toNat >= callExtraCost t r val accounts substate then
+    min (allButOneSixtyFourth <| (machine.gasAvailable.toNat - callExtraCost t r val accounts substate)) g.toNat
   else
     g.toNat
 
-def callGas (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
+def callGas (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (machine : MachineState) (substate : Substate) : ℕ :=
   match val with
-    | 0 => callGasCap t r val g σ μ A
-    | _ => callGasCap t r val g σ μ A + GasConstants.Gcallstipend
+    | 0 => callGasCap t r val g accounts machine substate
+    | _ => callGasCap t r val g accounts machine substate + GasConstants.Gcallstipend
 
 /--
 NB Assumes stack coherence.
 -/
-def callCost (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
-  callGasCap t r val g σ μ A + callExtraCost t r val σ A
+def callCost (t r : AccountAddress) (val g : UInt256) (accounts : AccountMap) (machine : MachineState) (substate : Substate) : ℕ :=
+  callGasCap t r val g accounts machine substate + callExtraCost t r val accounts substate
 
 /--
 (65)
@@ -132,7 +132,7 @@ def callCost (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : Ma
 def initCodeCost (x : ℕ) : ℕ := Ginitcodeword * ((x + 31) / 32)
 
 def intrinsicGas (T : Transaction) : ℕ :=
-  let g₀_data :=
+  let dataCost :=
     T.base.data.foldl
       (λ acc b ↦
         acc +
@@ -141,18 +141,18 @@ def intrinsicGas (T : Transaction) : ℕ :=
           else GasConstants.Gtxdatanonzero
       )
       0
-  let g₀_create : ℕ :=
+  let createCost : ℕ :=
     if T.base.recipient == none then
       GasConstants.Gtxcreate + initCodeCost (T.base.data.size)
     else 0
 
-  let g₀_accessList : ℕ :=
+  let accessListCost : ℕ :=
     T.getAccessList.foldl
       (λ acc (_, s) ↦
         acc + GasConstants.Gaccesslistaddress + s.size * GasConstants.Gaccessliststorage
       )
       0
-  g₀_data + g₀_create + GasConstants.Gtransaction + g₀_accessList
+  dataCost + createCost + GasConstants.Gtransaction + accessListCost
 
 /--
 H.1. Gas Cost - the third summand.
@@ -161,43 +161,43 @@ NB Stack accesses are assumed guarded here and we access with `!`.
 This is for keeping in sync with the way the YP is structures, at least for the time being.
 -/
 def operationCost (s : ExecutionState) (instr : Operation) : ℕ :=
-  let { accounts := σ, stack := μₛ, substate := A, toMachineState := μ, executionEnv := I, ..} := s
+  let { accounts := accounts, stack := stack, substate := substate, toMachineState := machine, executionEnv := env, ..} := s
   match instr with
     | .SSTORE => sstoreCost s
     | .TSTORE => tstoreCost
-    | .EXP => let μ₁ := μₛ[1]!; if μ₁ == 0 then Gexp else Gexp + Gexpbyte * (1 + Nat.log 256 μ₁.toNat) -- TODO(check) I think this floors by itself. cf. H.1. YP.
-    | .EXTCODECOPY => accessCost (AccountAddress.ofUInt256 μₛ[0]!) A + Gcopy * ((μₛ[3]!.toNat + 31) / 32)
-    | .LOG0 => Glog + Glogdata * μₛ[1]!.toNat
-    | .LOG1 => Glog + Glogdata * μₛ[1]!.toNat +     Glogtopic
-    | .LOG2 => Glog + Glogdata * μₛ[1]!.toNat + 2 * Glogtopic
-    | .LOG3 => Glog + Glogdata * μₛ[1]!.toNat + 3 * Glogtopic
-    | .LOG4 => Glog + Glogdata * μₛ[1]!.toNat + 4 * Glogtopic
+    | .EXP => let μ₁ := stack[1]!; if μ₁ == 0 then Gexp else Gexp + Gexpbyte * (1 + Nat.log 256 μ₁.toNat) -- TODO(check) This seems to floor by itself. cf. H.1. YP.
+    | .EXTCODECOPY => accessCost (AccountAddress.ofUInt256 stack[0]!) substate + Gcopy * ((stack[3]!.toNat + 31) / 32)
+    | .LOG0 => Glog + Glogdata * stack[1]!.toNat
+    | .LOG1 => Glog + Glogdata * stack[1]!.toNat +     Glogtopic
+    | .LOG2 => Glog + Glogdata * stack[1]!.toNat + 2 * Glogtopic
+    | .LOG3 => Glog + Glogdata * stack[1]!.toNat + 3 * Glogtopic
+    | .LOG4 => Glog + Glogdata * stack[1]!.toNat + 4 * Glogtopic
     | .SELFDESTRUCT => selfdestructCost s
-    | .CREATE => Gcreate + initCodeCost μₛ[2]!.toNat
-    | .CREATE2 => let μ₂ := μₛ[2]!; Gcreate + Gkeccak256word * ((μ₂.toNat + 31) / 32) + initCodeCost μ₂.toNat
-    | .KECCAK256 => Gkeccak256 + Gkeccak256word * ((μₛ[1]!.toNat + 31) / 32)
+    | .CREATE => Gcreate + initCodeCost stack[2]!.toNat
+    | .CREATE2 => let μ₂ := stack[2]!; Gcreate + Gkeccak256word * ((μ₂.toNat + 31) / 32) + initCodeCost μ₂.toNat
+    | .KECCAK256 => Gkeccak256 + Gkeccak256word * ((stack[1]!.toNat + 31) / 32)
     | .JUMPDEST => Gjumpdest
-    | .SLOAD => sloadCost μₛ A I
+    | .SLOAD => sloadCost stack substate env
     | .TLOAD => tloadCost
     | .BLOCKHASH => Gblockhash
     /-
-      By `μₛ[2]` the YP means the value that is to be transferred,
+      By `stack[2]` the YP means the value that is to be transferred,
       not what happens to be on the stack at index 2. Therefore it is 0 for
       `DELEGATECALL` and `STATICCALL`.
     -/
-    | .CALL =>         callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!) μₛ[2]! μₛ[0]! σ μ A
-    | .CALLCODE =>     callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.address μₛ[2]! μₛ[0]! σ μ A
-    | .DELEGATECALL => callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.address    0 μₛ[0]! σ μ A
-    | .STATICCALL =>   callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    0 μₛ[0]! σ μ A
+    | .CALL =>         callCost (AccountAddress.ofUInt256 stack[1]!) (AccountAddress.ofUInt256 stack[1]!) stack[2]! stack[0]! accounts machine substate
+    | .CALLCODE =>     callCost (AccountAddress.ofUInt256 stack[1]!)          s.executionEnv.address stack[2]! stack[0]! accounts machine substate
+    | .DELEGATECALL => callCost (AccountAddress.ofUInt256 stack[1]!)          s.executionEnv.address    0 stack[0]! accounts machine substate
+    | .STATICCALL =>   callCost (AccountAddress.ofUInt256 stack[1]!) (AccountAddress.ofUInt256 stack[1]!)    0 stack[0]! accounts machine substate
     | .BLOBHASH => HASH_OPCODE_GAS
     -- Direct match arms for the Appendix G instruction groups (W_copy, W_extaccount,
     -- W_zero, W_base, W_verylow, W_low, W_mid, W_high). Previously linear `List.elem`
     -- scans over the `InstructionGasGroups` lists per executed instruction — the single
     -- hottest spot in the interpreter profile.
     | .CALLDATACOPY | .CODECOPY | .RETURNDATACOPY | .MCOPY =>
-      Gverylow + Gcopy * ((μₛ[2]!.toNat + 31) / 32)
+      Gverylow + Gcopy * ((stack[2]!.toNat + 31) / 32)
     | .BALANCE | .EXTCODESIZE | .EXTCODEHASH =>
-      accessCost (AccountAddress.ofUInt256 μₛ[0]!) A
+      accessCost (AccountAddress.ofUInt256 stack[0]!) substate
     | .STOP | .RETURN | .REVERT => Gzero
     | .ADDRESS | .ORIGIN | .CALLER | .CALLVALUE | .CALLDATASIZE | .CODESIZE | .GASPRICE
     | .COINBASE | .TIMESTAMP | .NUMBER | .PREVRANDAO | .GASLIMIT | .CHAINID

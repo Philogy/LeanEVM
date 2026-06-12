@@ -18,7 +18,7 @@ namespace Evm
 /--
 The `State`. Section 9.3.
 
-- `accounts`     `σ`
+- `accounts`     `accounts`
 - `substate`     `A`
 - `executionEnv` `I`
 - `totalGasUsedInBlock` `Υᵍ`

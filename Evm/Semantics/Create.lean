@@ -10,15 +10,15 @@ import Evm.Crypto.Keccak256
 
 namespace Evm
 
-/-- The address-derivation preimage `contractAddressBytes` (eq. 96). -/
-private def contractAddressBytes (s : AccountAddress) (n : UInt256) (ζ : Option ByteArray) (i : ByteArray) :
+/-- The address-derivation preimage `L_A` (eq. 96). -/
+private def contractAddressBytes (creator : AccountAddress) (creatorNonce : UInt256) (salt : Option ByteArray) (initCode : ByteArray) :
   Option ByteArray
 :=
-  let s := s.toByteArray
-  let n := BE n.toNat
-  match ζ with
-    | none   => Rlp.encode <| .list [.bytes s, .bytes n]
-    | some ζ => .some <| BE 255 ++ s ++ ζ ++ ffi.KEC i
+  let creator := creator.toByteArray
+  let creatorNonce := BE creatorNonce.toNat
+  match salt with
+    | none   => Rlp.encode <| .list [.bytes creator, .bytes creatorNonce]
+    | some salt => .some <| BE 255 ++ creator ++ salt ++ ffi.KEC initCode
 
 /--
 Enter a contract creation — the YP's `Λ` (eq. 93) up to the recursive code
@@ -27,22 +27,22 @@ check, account initialisation (eq. 97–99), and execution-environment
 construction.
 -/
 def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
-  let σ := params.accounts
-  let s := params.caller
+  let accounts := params.accounts
+  let creator := params.caller
 
   -- EIP-3860 (includes EIP-170)
   -- https://eips.ethereum.org/EIPS/eip-3860
 
-  let n : UInt256 := (σ.find? s |>.option 0 (·.nonce)) - 1
-  let some lₐ := contractAddressBytes s n params.salt params.initCode | .error .StackUnderflow
-  let a : AccountAddress := -- (94) (95)
-    (ffi.KEC lₐ).extract 12 32 /- 160 bits = 20 bytes -/
+  let creatorNonce : UInt256 := (accounts.find? creator |>.option 0 (·.nonce)) - 1
+  let some addressPreimage := contractAddressBytes creator creatorNonce params.salt params.initCode | .error .StackUnderflow
+  let newAddress : AccountAddress := -- (94) (95)
+    (ffi.KEC addressPreimage).extract 12 32 /- 160 bits = 20 bytes -/
       |> fromByteArrayBigEndian |> Fin.ofNat _
 
   -- A* (97)
-  let AStar := params.substate.addAccessedAccount a
-  -- σ*
-  let existentAccount := σ.findD a default
+  let substateWithNew := params.substate.addAccessedAccount newAddress
+  -- σ* (99)
+  let existentAccount := accounts.findD newAddress default
 
   /-
     https://eips.ethereum.org/EIPS/eip-7610
@@ -52,14 +52,14 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
     a nonzero code length, or non-empty storage, then the creation MUST throw
     as if the first byte in the init code were an invalid opcode.
   -/
-  let (i, createdAccounts) :=
+  let (initCode, createdAccounts) :=
     if
       existentAccount.nonce ≠ 0
         || existentAccount.code.size ≠ 0
         || existentAccount.storage != default
     then
       (⟨#[0xfe]⟩, params.createdAccounts)
-    else (params.initCode, params.createdAccounts.insert a)
+    else (params.initCode, params.createdAccounts.insert newAddress)
 
   let newAccount : Account :=
     { existentAccount with
@@ -67,21 +67,20 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
         balance := params.value + existentAccount.balance
     }
 
-  -- If `v` ≠ 0 then the sender must have passed the `INSUFFICIENT_ACCOUNT_FUNDS` check
-  let σStar :=
-    match σ.find? s with
-      | none => σ
+  -- If `value` ≠ 0 then the sender must have passed the `INSUFFICIENT_ACCOUNT_FUNDS` check
+  let accountsWithNew :=
+    match accounts.find? creator with
+      | none => accounts
       | some ac =>
-        σ.insert s { ac with balance := ac.balance - params.value }
-          |>.insert a newAccount -- (99)
-  -- I
-  let exEnv : ExecutionEnv :=
-    { address := a
+        accounts.insert creator { ac with balance := ac.balance - params.value }
+          |>.insert newAddress newAccount -- (99)
+  let env : ExecutionEnv :=
+    { address := newAddress
     , origin    := params.origin
-    , caller    := s
+    , caller    := creator
     , value  := params.value
     , calldata  := default
-    , code      := i
+    , code      := initCode
     , gasPrice  := params.gasPrice.toNat
     , blockHeader := params.blockHeader
     , depth     := params.depth
@@ -89,14 +88,14 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
     , blobVersionedHashes := params.blobVersionedHashes
     }
   .ok
-    { kind := .create a ⟨createdAccounts, σ, AStar⟩
-      validJumps := validJumpDests i 0
+    { kind := .create newAddress ⟨createdAccounts, accounts, substateWithNew⟩
+      validJumps := validJumpDests initCode 0
       exec :=
         { (default : ExecutionState) with
-            accounts := σStar
+            accounts := accountsWithNew
             originalAccounts := params.originalAccounts
-            executionEnv := exEnv
-            substate := AStar
+            executionEnv := env
+            substate := substateWithNew
             createdAccounts := createdAccounts
             gasAvailable := params.gas
             blocks := params.blocks
@@ -111,30 +110,30 @@ either store the code or roll back to the checkpoint (eq. 115–117).
 def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt → CreateResult
   | .success exec returnedData =>
     -- The code-deposit cost (113)
-    let c := GasConstants.Gcodedeposit * returnedData.size
+    let depositCost := GasConstants.Gcodedeposit * returnedData.size
 
-    let F : Bool := Id.run do -- (118)
-      let F₀ : Bool :=
+    let deploymentFailed : Bool := Id.run do -- (118)
+      let addressOccupied : Bool :=
         match checkpoint.accounts.find? address with
         | .some ac => ac.code ≠ .empty ∨ ac.nonce ≠ 0
         | .none => false
-      let F₂ : Bool := exec.gasAvailable.toNat < c
+      let cannotAffordDeposit : Bool := exec.gasAvailable.toNat < depositCost
       let MAX_CODE_SIZE := 24576
-      let F₃ : Bool := returnedData.size > MAX_CODE_SIZE
-      let F₄ : Bool := ¬F₃ && returnedData[0]? = some 0xef
-      pure (F₀ ∨ F₂ ∨ F₃ ∨ F₄)
+      let codeTooLong : Bool := returnedData.size > MAX_CODE_SIZE
+      let startsWith0xef : Bool := ¬codeTooLong && returnedData[0]? = some 0xef
+      pure (addressOccupied ∨ cannotAffordDeposit ∨ codeTooLong ∨ startsWith0xef)
 
-    let σ' : AccountMap := -- (115)
-      if F then checkpoint.accounts else
+    let accounts' : AccountMap := -- (115)
+      if deploymentFailed then checkpoint.accounts else
         let newAccount' := exec.accounts.findD address default
         exec.accounts.insert address { newAccount' with code := returnedData }
 
     { address := address
       createdAccounts := exec.createdAccounts
-      accounts := σ'
-      gasRemaining := .ofNat <| if F then 0 else exec.gasAvailable.toNat - c -- (114)
-      substate := if F then checkpoint.substate else exec.substate -- (116)
-      success := !F -- (117)
+      accounts := accounts'
+      gasRemaining := .ofNat <| if deploymentFailed then 0 else exec.gasAvailable.toNat - depositCost -- (114)
+      substate := if deploymentFailed then checkpoint.substate else exec.substate -- (116)
+      success := !deploymentFailed -- (117)
       output := .empty } -- (93)
   | .revert gasRemaining output =>
     { address := address
@@ -155,21 +154,21 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
 
 /--
 Resume a frame suspended on CREATE/CREATE2: restore the unused gas (the
-parent retained `g − allButOneSixtyFourth(g)`), set the return data on failure, push the new
+parent retained `g − L(g)`), set the return data on failure, push the new
 contract's address (or 0), and advance the pc.
 -/
 def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
     Except ExecutionException Frame := do
   let evmState := pd.frame.exec
-  let g := evmState.gasAvailable
-  let g' := result.gasRemaining
-  let z := result.success
-  let x : UInt256 :=
+  let gas := evmState.gasAvailable
+  let gasRemaining := result.gasRemaining
+  let success := result.success
+  let pushedValue : UInt256 :=
     let balance := pd.callerAccounts.find? evmState.executionEnv.address |>.option 0 (·.balance)
-    if z = false ∨ evmState.executionEnv.depth = 1024 ∨ pd.value > balance ∨ pd.initCodeSize > 49152
+    if success = false ∨ evmState.executionEnv.depth = 1024 ∨ pd.value > balance ∨ pd.initCodeSize > 49152
     then 0 else .ofNat result.address
-  let newReturnData : ByteArray := if z then .empty else result.output
-  if (g + g').toNat < allButOneSixtyFourth g.toNat then
+  let newReturnData : ByteArray := if success then .empty else result.output
+  if (gas + gasRemaining).toNat < allButOneSixtyFourth gas.toNat then
     throw .OutOfGass
   let exec' :=
     { evmState with
@@ -178,7 +177,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
         createdAccounts := result.createdAccounts
         activeWords := .ofNat <| MachineState.M evmState.activeWords.toNat pd.initOffset.toNat pd.initSize.toNat
         returnData := newReturnData
-        gasAvailable := .ofNat <| g.toNat - allButOneSixtyFourth g.toNat + g'.toNat }
-  return { pd.frame with exec := exec'.replaceStackAndIncrPC (pd.stack.push x) }
+        gasAvailable := .ofNat <| gas.toNat - allButOneSixtyFourth gas.toNat + gasRemaining.toNat }
+  return { pd.frame with exec := exec'.replaceStackAndIncrPC (pd.stack.push pushedValue) }
 
 end Evm

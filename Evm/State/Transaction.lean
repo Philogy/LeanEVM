@@ -142,7 +142,7 @@ def Transaction.type : Transaction → UInt8
 def Transaction.toBlobs (t : ℕ × ByteArray) : Option (String × String) := do
   let rlpᵢ ← Rlp.encode (.bytes (BE t.1))
   let rlp := t.2
-  pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
+  pure (toHex rlpᵢ, toHex rlp)
 
 def Transaction.computeTrieRoot (ts : Array ByteArray) : Option ByteArray := do
   match Array.mapM Transaction.toBlobs ((Array.range ts.size).zip ts) with
@@ -169,7 +169,7 @@ def TransactionReceipt.toRlp : TransactionReceipt → Rlp
 def TransactionReceipt.toBlobs (w : ℕ × ByteArray) : Option (String × String) := do
   let rlpᵢ ← Rlp.encode (.bytes (BE w.1))
   let rlp ← w.2
-  pure (Evm.toHex rlpᵢ, Evm.toHex rlp)
+  pure (toHex rlpᵢ, toHex rlp)
 
 -- EIP-4895
 def TransactionReceipt.computeTrieRoot (ws : Array ByteArray) : Option ByteArray := do

@@ -15,30 +15,30 @@ open Batteries (RBMap RBSet)
 
 /-- Execute one transaction — the YP's `Υ` (section 6). -/
 def executeTransaction
-  (σ : AccountMap)
-  (H_f : ℕ)
-  (H : BlockHeader)
+  (accounts : AccountMap)
+  (baseFee : ℕ)
+  (header : BlockHeader)
   (genesisBlockHeader : BlockHeader)
   (blocks : ProcessedBlocks)
-  (T : Transaction)
-  (S_T : AccountAddress)
+  (tx : Transaction)
+  (sender : AccountAddress)
   : Except Exception TransactionResult
 := do
-  let g₀ : ℕ := intrinsicGas T
+  let intrinsicCost : ℕ := intrinsicGas tx
   -- "here can be no invalid transactions from this point"
-  let senderAccount := (σ.find? S_T).get!
+  let senderAccount := (accounts.find? sender).get!
   -- The priority fee (67)
-  let f :=
-    match T with
+  let priorityFee :=
+    match tx with
       | .legacy t | .access t =>
-            t.gasPrice - .ofNat H_f
+            t.gasPrice - .ofNat baseFee
       | .dynamic t | .blob t =>
-            min t.maxPriorityFeePerGas (t.maxFeePerGas - .ofNat H_f)
+            min t.maxPriorityFeePerGas (t.maxFeePerGas - .ofNat baseFee)
   -- The effective gas price
-  let p := -- (66)
-    match T with
+  let effectiveGasPrice := -- (66)
+    match tx with
       | .legacy t | .access t => t.gasPrice
-      | .dynamic _ | .blob _ => f + .ofNat H_f
+      | .dynamic _ | .blob _ => priorityFee + .ofNat baseFee
   let senderAccount :=
     { senderAccount with
         /-
@@ -47,49 +47,49 @@ def executeTransaction
           the sender balance before transaction execution and burned, and is not
           refunded in case of transaction failure."
         -/
-        balance := senderAccount.balance - T.base.gasLimit * p - .ofNat (calcBlobFee H T)  -- (74)
+        balance := senderAccount.balance - tx.base.gasLimit * effectiveGasPrice - .ofNat (calcBlobFee header tx)  -- (74)
         nonce := senderAccount.nonce + 1 -- (75)
     }
   -- The checkpoint state (73)
-  let σ₀ := σ.insert S_T senderAccount
-  let accessList := T.getAccessList
-  let AStar_K : List (AccountAddress × UInt256) := do -- (78)
-    let ⟨Eₐ, Eₛ⟩ ← accessList
-    let eₛ ← Eₛ.toList
-    pure (Eₐ, eₛ)
-  let a := -- (80)
-    initialSubstate.accessedAccounts.insert S_T
-      |>.insert H.beneficiary
+  let checkpointState := accounts.insert sender senderAccount
+  let accessList := tx.getAccessList
+  let accessedStorageKeys : List (AccountAddress × UInt256) := do -- (78)
+    let ⟨entryAddress, entryKeys⟩ ← accessList
+    let entryKey ← entryKeys.toList
+    pure (entryAddress, entryKey)
+  let baseAccessedAccounts := -- (80)
+    initialSubstate.accessedAccounts.insert sender
+      |>.insert header.beneficiary
       |>.union <| Batteries.RBSet.ofList (accessList.map Prod.fst) compare
   -- (81)
-  let g := .ofNat <| T.base.gasLimit.toNat - g₀
-  let AStarₐ := -- (79)
-    match T.base.recipient with
-      | some t => a.insert t
-      | none => a
-  let AStar := -- (77)
-    { initialSubstate with accessedAccounts := AStarₐ, accessedStorageKeys := Batteries.RBSet.ofList AStar_K Substate.storageKeysCmp}
-  let (/- provisional state -/ σ_P, g', A, z) ← -- (76)
-    match T.base.recipient with
+  let gas := .ofNat <| tx.base.gasLimit.toNat - intrinsicCost
+  let accessedAccounts := -- (79)
+    match tx.base.recipient with
+      | some t => baseAccessedAccounts.insert t
+      | none => baseAccessedAccounts
+  let substate₀ := -- (77)
+    { initialSubstate with accessedAccounts := accessedAccounts, accessedStorageKeys := Batteries.RBSet.ofList accessedStorageKeys Substate.storageKeysCmp}
+  let (/- provisional state -/ provisionalState, gasRemaining, substate, success) ← -- (76)
+    match tx.base.recipient with
       | none => do
         match
           createContract
-            { blobVersionedHashes := T.blobVersionedHashes
+            { blobVersionedHashes := tx.blobVersionedHashes
               createdAccounts := .empty
               genesisBlockHeader := genesisBlockHeader
               blocks := blocks
-              accounts := σ₀
-              originalAccounts := σ₀
-              substate := AStar
-              caller := S_T
-              origin := S_T
-              gas := g
-              gasPrice := p
-              value := T.base.value
-              initCode := T.base.data
+              accounts := checkpointState
+              originalAccounts := checkpointState
+              substate := substate₀
+              caller := sender
+              origin := sender
+              gas := gas
+              gasPrice := effectiveGasPrice
+              value := tx.base.value
+              initCode := tx.base.data
               depth := 0
               salt := none
-              blockHeader := H
+              blockHeader := header
               canModifyState := true }
         with
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
@@ -98,43 +98,43 @@ def executeTransaction
         -- Proposition (71) suggests the recipient can be inexistent
         match
           messageCall
-            { blobVersionedHashes := T.blobVersionedHashes
+            { blobVersionedHashes := tx.blobVersionedHashes
               createdAccounts := .empty
               genesisBlockHeader := genesisBlockHeader
               blocks := blocks
-              accounts := σ₀
-              originalAccounts := σ₀
-              substate := AStar
-              caller := S_T
-              origin := S_T
+              accounts := checkpointState
+              originalAccounts := checkpointState
+              substate := substate₀
+              caller := sender
+              origin := sender
               recipient := t
-              codeSource := toExecute σ₀ t
-              gas := g
-              gasPrice := p
-              value := T.base.value
-              apparentValue := T.base.value
-              calldata := T.base.data
+              codeSource := toExecute checkpointState t
+              gas := gas
+              gasPrice := effectiveGasPrice
+              value := tx.base.value
+              apparentValue := tx.base.value
+              calldata := tx.base.data
               depth := 0
-              blockHeader := H
+              blockHeader := header
               canModifyState := true }
         with
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
           | .error e => .error <| .ExecutionException e
   -- The amount to be refunded (82)
-  let gStar := g' + min ((T.base.gasLimit - g') / 5) A.refundBalance
+  let gasRefunded := gasRemaining + min ((tx.base.gasLimit - gasRemaining) / 5) substate.refundBalance
   -- The pre-final state (83)
-  let σStar :=
-    σ_P.increaseBalance S_T (gStar * p)
+  let accountsWithRefund :=
+    provisionalState.increaseBalance sender (gasRefunded * effectiveGasPrice)
 
-  let beneficiaryFee := (T.base.gasLimit - gStar) * f
-  let σStar' :=
+  let beneficiaryFee := (tx.base.gasLimit - gasRefunded) * priorityFee
+  let accountsWithFees :=
     if beneficiaryFee != 0 then
-      σStar.increaseBalance H.beneficiary beneficiaryFee
-    else σStar
-  let σ' := A.selfDestructSet.1.foldl Batteries.RBMap.erase σStar' -- (87)
-  let deadAccounts := A.touchedAccounts.filter (Evm.State.dead σStar' ·)
-  let σ' := deadAccounts.foldl Batteries.RBMap.erase σ' -- (88)
-  let σ' := σ'.map λ (addr, acc) ↦ (addr, { acc with tstorage := .empty})
-  .ok { accounts := σ', substate := A, success := z, gasUsed := T.base.gasLimit - gStar }
+      accountsWithRefund.increaseBalance header.beneficiary beneficiaryFee
+    else accountsWithRefund
+  let accounts' := substate.selfDestructSet.1.foldl Batteries.RBMap.erase accountsWithFees -- (87)
+  let deadAccounts := substate.touchedAccounts.filter (Evm.State.dead accountsWithFees ·)
+  let accounts' := deadAccounts.foldl Batteries.RBMap.erase accounts' -- (88)
+  let accounts' := accounts'.map λ (addr, acc) ↦ (addr, { acc with tstorage := .empty})
+  .ok { accounts := accounts', substate := substate, success := success, gasUsed := tx.base.gasLimit - gasRefunded }
 
 end Evm

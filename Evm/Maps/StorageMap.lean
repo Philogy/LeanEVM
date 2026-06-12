@@ -42,7 +42,7 @@ def Storage.toEvmYulStorage (self : Storage) : Evm.Storage :=
 def toBlobs (pair : UInt256 × UInt256) : Option (String × String) := do
   let kec := ffi.KEC pair.1.toByteArray
   let rlp ← Rlp.encode (.bytes (BE pair.2.toNat))
-  pure (Evm.toHex kec, Evm.toHex rlp)
+  pure (toHex kec, toHex rlp)
 
 def computeTrieRoot (storage : Storage) : Option ByteArray :=
   match Array.mapM toBlobs storage.1.toArray with

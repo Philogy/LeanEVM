@@ -18,10 +18,10 @@ def addAccessedStorageKey (self : State) (sk : AccountAddress × UInt256) : Stat
   { self with substate := self.substate.addAccessedStorageKey sk }
 
 /--
-DEAD(σ, a). Section 4.1., equation 15.
+DEAD(accounts, a). Section 4.1., equation 15.
 -/
-def dead (σ : AccountMap) (addr : AccountAddress) : Bool :=
-  σ.find? addr |>.option True Account.emptyAccount
+def dead (accounts : AccountMap) (addr : AccountAddress) : Bool :=
+  accounts.find? addr |>.option True Account.emptyAccount
 
 def accountExists (self : State) (addr : AccountAddress) : Bool := self.accounts.find? addr |>.isSome
 
@@ -45,8 +45,8 @@ def balance (self : State) (k : UInt256) : State × UInt256 :=
 def initialiseAccount (addr : AccountAddress) (self : State) : State :=
   if self.accountExists addr then self else self.updateAccount addr default
 
-def calldataload (self : State) (v : UInt256) : UInt256 :=
-  uInt256OfByteArray <| self.executionEnv.calldata.readBytes v.toNat 32
+def calldataload (self : State) (currentValue : UInt256) : UInt256 :=
+  uInt256OfByteArray <| self.executionEnv.calldata.readBytes currentValue.toNat 32
 
 def setNonce! (self : State) (addr : AccountAddress) (nonce : UInt256) : State :=
   self.updateAccount! addr (λ acc ↦ { acc with nonce := nonce })
@@ -58,11 +58,11 @@ def extCodeSize (self : State) (a : UInt256) : State × UInt256 :=
   let s := self.lookupAccount addr |>.option 0 (.ofNat ∘ ByteArray.size ∘ (·.code))
   (self.addAccessedAccount addr, s)
 
-def extCodeHash (self : State) (v : UInt256) : State × UInt256 :=
-  let addr := AccountAddress.ofUInt256 v
+def extCodeHash (self : State) (currentValue : UInt256) : State × UInt256 :=
+  let addr := AccountAddress.ofUInt256 currentValue
   let newState := self.addAccessedAccount addr
   if dead self.accounts addr then (newState, 0) else
-  let r := self.lookupAccount (AccountAddress.ofUInt256 v) |>.option 0 Account.codeHash
+  let r := self.lookupAccount (AccountAddress.ofUInt256 currentValue) |>.option 0 Account.codeHash
   (newState, r)
 
 end CodeCopy
@@ -70,8 +70,8 @@ end CodeCopy
 section Blocks
 
 def blockHash (self : State) (blockNumber : UInt256) : UInt256 :=
-  let v := self.executionEnv.blockHeader.number
-  if v ≤ blockNumber.toNat || blockNumber.toNat + 256 < v then 0
+  let currentValue := self.executionEnv.blockHeader.number
+  if currentValue ≤ blockNumber.toNat || blockNumber.toNat + 256 < currentValue then 0
   else
     let hashes := self.blockHashes
     hashes.getD blockNumber.toNat 0
@@ -104,55 +104,55 @@ def setStorage! (self : State) (addr : AccountAddress) (strg : Storage) : State 
   self.updateAccount! addr (λ acc ↦ { acc with storage := strg })
 
 def sload (self : State) (spos : UInt256) : State × UInt256 :=
-  let Iₐ := self.executionEnv.address
-  let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupStorage (k := spos))
-  let state' := self.addAccessedStorageKey (Iₐ, spos)
-  (state', v)
+  let selfAddress := self.executionEnv.address
+  let currentValue := self.lookupAccount selfAddress |>.option 0 (Account.lookupStorage (k := spos))
+  let state' := self.addAccessedStorageKey (selfAddress, spos)
+  (state', currentValue)
 
 def sstore (self : State) (spos sval : UInt256) : State :=
-  let Iₐ := self.executionEnv.address
-  let { storage := σ_Iₐ, .. } := self.accounts.find! Iₐ
-  let v₀ :=
-    match self.originalAccounts.find? Iₐ with
+  let selfAddress := self.executionEnv.address
+  let { storage := selfStorage, .. } := self.accounts.find! selfAddress
+  let originalValue :=
+    match self.originalAccounts.find? selfAddress with
       | none => 0
       | some acc => acc.storage.findD spos 0
-  let v := σ_Iₐ.findD spos 0
-  let v' := sval
+  let currentValue := selfStorage.findD spos 0
+  let newValue := sval
 
   let r_dirtyclear : ℤ :=
-    if v₀ ≠ .ofNat 0 && v = .ofNat 0 then - GasConstants.Rsclear else
-    if v₀ ≠ .ofNat 0 && v' = .ofNat 0 then GasConstants.Rsclear else
+    if originalValue ≠ .ofNat 0 && currentValue = .ofNat 0 then - GasConstants.Rsclear else
+    if originalValue ≠ .ofNat 0 && newValue = .ofNat 0 then GasConstants.Rsclear else
     0
 
   let r_dirtyreset : ℤ :=
-    if v₀ = v' && v₀ = .ofNat 0 then GasConstants.Gsset - GasConstants.Gwarmaccess else
-    if v₀ = v' && v₀ ≠ .ofNat 0 then GasConstants.Gsreset - GasConstants.Gwarmaccess else
+    if originalValue = newValue && originalValue = .ofNat 0 then GasConstants.Gsset - GasConstants.Gwarmaccess else
+    if originalValue = newValue && originalValue ≠ .ofNat 0 then GasConstants.Gsreset - GasConstants.Gwarmaccess else
     0
 
   let ΔAᵣ : ℤ :=
-    if v ≠ v' && v₀ = v && v' = .ofNat 0 then GasConstants.Rsclear else
-    if v ≠ v' && v₀ ≠ v then r_dirtyclear + r_dirtyreset else
+    if currentValue ≠ newValue && originalValue = currentValue && newValue = .ofNat 0 then GasConstants.Rsclear else
+    if currentValue ≠ newValue && originalValue ≠ currentValue then r_dirtyclear + r_dirtyreset else
     0
 
   let newAᵣ : UInt256 :=
     match ΔAᵣ with
       | .ofNat n => self.substate.refundBalance + .ofNat n
       | .negSucc n => self.substate.refundBalance - .ofNat n - 1
-  self.lookupAccount Iₐ |>.option self λ acc ↦
+  self.lookupAccount selfAddress |>.option self λ acc ↦
     let self' :=
-      self.setAccount Iₐ (acc.updateStorage spos sval)
-        |>.addAccessedStorageKey (Iₐ, spos)
+      self.setAccount selfAddress (acc.updateStorage spos sval)
+        |>.addAccessedStorageKey (selfAddress, spos)
     { self' with substate.refundBalance := newAᵣ }
 
 def tload (self : State) (spos : UInt256) : State × UInt256 :=
-  let Iₐ := self.executionEnv.address
-  let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupTransientStorage (k := spos))
-  (self, v)
+  let selfAddress := self.executionEnv.address
+  let currentValue := self.lookupAccount selfAddress |>.option 0 (Account.lookupTransientStorage (k := spos))
+  (self, currentValue)
 
 def tstore (self : State) (spos sval : UInt256) : State :=
-  let Iₐ := self.executionEnv.address
-  self.lookupAccount Iₐ |>.option self λ acc ↦
-    self.updateAccount Iₐ (acc.updateTransientStorage spos sval)
+  let selfAddress := self.executionEnv.address
+  self.lookupAccount selfAddress |>.option self λ acc ↦
+    self.updateAccount selfAddress (acc.updateTransientStorage spos sval)
 
 end Storage
 

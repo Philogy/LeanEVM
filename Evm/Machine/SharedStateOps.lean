@@ -48,12 +48,12 @@ def extCodeCopy' (self : SharedState) (acc mstart cstart size : UInt256) : Share
 
 end Memory
 
-def logOp (μ₀ μ₁ : UInt256) (t : Array UInt256) (sState : SharedState) : SharedState :=
-  let Iₐ := sState.executionEnv.address
-  let mem := sState.memory.readWithPadding μ₀.toNat μ₁.toNat
+def logOp (offset size : UInt256) (t : Array UInt256) (sState : SharedState) : SharedState :=
+  let self := sState.executionEnv.address
+  let mem := sState.memory.readWithPadding offset.toNat size.toNat
   { sState with
-    substate.logSeries := sState.substate.logSeries.push ⟨Iₐ, t, mem⟩
-    activeWords := .ofNat (MachineState.M sState.activeWords.toNat μ₀.toNat μ₁.toNat)
+    substate.logSeries := sState.substate.logSeries.push ⟨self, t, mem⟩
+    activeWords := .ofNat (MachineState.M sState.activeWords.toNat offset.toNat size.toNat)
   }
 
 end SharedState
