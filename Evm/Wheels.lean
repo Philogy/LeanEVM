@@ -54,36 +54,6 @@ instance : Inhabited Identifier := inferInstanceAs (Inhabited String)
 instance : DecidableEq Identifier := inferInstanceAs (DecidableEq String)
 instance : Repr Identifier := inferInstanceAs (Repr String)
 
-namespace NaryNotation
-
-scoped syntax "!nary[" ident "^" num "]" : term
-
-open Lean in
-scoped macro_rules
-  | `(!nary[ $idn:ident ^ $nat:num ]) =>
-    let rec go (n : ℕ) : MacroM Term :=
-      match n with
-        | 0     => `($idn)
-        | n + 1 => do `($idn → $(←go n))
-    go nat.getNat
-
-end NaryNotation
-
-namespace Primop
-
-section
-
-open NaryNotation
-
-def Unary      := !nary[UInt256 ^ 1]
-def Binary     := !nary[UInt256 ^ 2]
-def Ternary    := !nary[UInt256 ^ 3]
-def Quaternary := !nary[UInt256 ^ 4]
-
-end
-
-end Primop
-
 end Evm
 
 /--

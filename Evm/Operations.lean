@@ -730,15 +730,4 @@ abbrev REVERT       : Operation := .System .REVERT
 abbrev INVALID      : Operation := .System .INVALID
 abbrev SELFDESTRUCT : Operation := .System .SELFDESTRUCT
 
-def isJump : Operation → Bool
-  | .JUMP => true
-  | .JUMPI => true
-  | _ => false
-
-def isCreate : Operation → Bool
-  | .CREATE => true
-  | .CREATE2 => true
-  | _ => false
-
-
 end Operation

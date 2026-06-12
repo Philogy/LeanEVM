@@ -40,17 +40,22 @@ Evm/Machine/
 
 ## Semantics
 The interpreter is a yield/resume frame machine: executing one instruction
-either continues the current frame, halts it, or suspends it on a call or
-contract creation (`Evm/Semantics/Step.lean`). The only recursion in the
-spec is the driver loop `drive` (`Evm/Semantics/Interpreter.lean`), which
-owns the frame stack. Calls and creations are split into non-recursive
+emits a `Signal` — continue the current frame, halt it (carrying the
+RETURN/REVERT payload), or suspend it on a call or contract creation. All
+opcode-specific logic lives in one central dispatcher match
+(`Evm/Semantics/Dispatch.lean`): each arm pops its operands once, charges
+its gas (named Appendix G formulas from `Gas.lean` applied to the popped
+operands), runs its own validity checks, and executes; a tiny preamble
+handles the purely syntactic δ/α stack-arity checks. The only recursion in
+the spec is the driver loop `drive` (`Evm/Semantics/Interpreter.lean`),
+which owns the frame stack. Calls and creations are split into non-recursive
 `begin`/`end`/`resumeAfter` handlers (`Call.lean`, `Create.lean`), and the
 public entry points are `messageCall` / `createContract` (the Yellow Paper's
 `Θ` and `Λ`) plus `executeTransaction` (the YP's `Υ`) in `Evm/Semantics.lean`:
 ```
 Evm/Semantics.lean         -- executeTransaction (Υ)
 Evm/Semantics/Interpreter.lean
-Evm/Semantics/Step.lean    Evm/Semantics/Instructions.lean
+Evm/Semantics/Dispatch.lean
 Evm/Semantics/Call.lean    Evm/Semantics/Create.lean
 Evm/Semantics/Frame.lean   Evm/Semantics/Params.lean
 Evm/Semantics/Decode.lean  Evm/Semantics/PrimOps.lean

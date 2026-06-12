@@ -70,17 +70,6 @@ def mcopy (self : MachineState) (writeStart readStart s : UInt256) : MachineStat
       .ofNat (MachineState.M self.activeWords.toNat (max writeStart.toNat readStart.toNat) s.toNat)
   }
 
-def gas (self : MachineState) : UInt256 :=
-  self.gasAvailable
-
-section ReturnData
-
-def setReturnData (self : MachineState) (r : ByteArray) : MachineState :=
-  { self with returnData := r }
-
-def returndatasize (self : MachineState) : UInt256 :=
-  .ofNat self.returnData.size
-
 def returndatacopy (self : MachineState) (mstart rstart size : UInt256) : MachineState :=
   let self := writeBytes self.returnData rstart.toNat self mstart.toNat size.toNat
   { self with
@@ -88,23 +77,12 @@ def returndatacopy (self : MachineState) (mstart rstart size : UInt256) : Machin
       .ofNat (MachineState.M self.activeWords.toNat mstart.toNat size.toNat)
   }
 
-
-end ReturnData
-
 def keccak256 (self : MachineState) (mstart s : UInt256) : UInt256 × MachineState :=
   let bytes := self.memory.readWithPadding mstart.toNat s.toNat
   let kec := ffi.KEC bytes
   let newMachineState :=
     { self with activeWords := .ofNat (M self.activeWords.toNat mstart.toNat s.toNat) }
   (.ofNat (fromByteArrayBigEndian kec), newMachineState)
-
-section Gas
-
-end Gas
-
-section Storage
-
-end Storage
 
 end MachineState
 

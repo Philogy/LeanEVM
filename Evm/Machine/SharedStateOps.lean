@@ -9,15 +9,7 @@ namespace Evm
 
 namespace SharedState
 
-section Keccak
-
-end Keccak
-
 section Memory
-
-def writeWord (self : SharedState) (addr v : UInt256) : SharedState :=
-  { self with toMachineState := self.toMachineState.writeWord addr v }
-
 
 def calldatacopy (self : SharedState) (mstart datastart size : UInt256) : SharedState :=
   { self with

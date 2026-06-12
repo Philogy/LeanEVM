@@ -21,8 +21,4 @@ structure ExecutionState extends Evm.SharedState where
   execLength : ℕ
   deriving Inhabited
 
-inductive ExecutionResult (S : Type) where
-  | success (state : S) (o : ByteArray)
-  | revert (g : UInt256) (o : ByteArray)
-
 end Evm
