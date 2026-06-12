@@ -514,8 +514,6 @@ def abs (a : UInt256) : UInt256 :=
   then sub 0 a
   else a
 
-def fromSigned (a : UInt256) : ℤ := a.toBitVec.toInt
-
 def toSigned (i : ℤ) : UInt256 :=
   match i with
     | .ofNat n => ofNat n
@@ -547,8 +545,6 @@ def sgn (a : UInt256) : ℤ :=
     -1
   else
     if eq0 a then 0 else 1
-
-def bigUInt : UInt256 := ofNat 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 def sdiv (a b : UInt256) : UInt256 :=
   if 2 ^ 255 <= a.toNat then
@@ -683,11 +679,6 @@ private def zeroPadBytes (n : ℕ) (bs : List UInt8) : List UInt8 :=
   bs ++ (List.replicate (n - bs.length)) 0
 
 def fromBytes! (bs : List UInt8) : ℕ := fromBytes' (bs.take 32)
-
--- Convenience function for spooning into UInt256.
--- Given that I 'accept' UInt8, might as well live with UInt256.
-def fromBytes_if_you_really_must? (bs : List UInt8) : UInt256 :=
-  .ofNat (fromBytes! bs)
 
 def toBytes! (n : UInt256) : List UInt8 := zeroPadBytes 32 (toBytes' n.toNat)
 

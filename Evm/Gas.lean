@@ -16,73 +16,9 @@ namespace Evm
 Appendix G. Fee Schedule
 -/
 
-namespace InstructionGasGroups
-
-def Wzero : List (Operation) := [.STOP, .RETURN, .REVERT]
-
-def Wbase : List (Operation) := [
-  .ADDRESS, .ORIGIN, .CALLER, .CALLVALUE, .CALLDATASIZE, .CODESIZE, .GASPRICE, .COINBASE,
-  .TIMESTAMP, .NUMBER, .PREVRANDAO, .GASLIMIT, .CHAINID, .RETURNDATASIZE, .POP, .PC, .MSIZE, .GAS,
-  .BASEFEE, .BLOBBASEFEE, .PUSH0]
-
-def Wverylow : List (Operation) := [
-  .ADD, .SUB, .NOT, .LT, .GT, .SLT, .SGT, .EQ, .ISZERO, .AND, .OR, .XOR, .BYTE, .SHL, .SHR, .SAR,
-  .CALLDATALOAD, .MLOAD, .MSTORE, .MSTORE8
-  ] ++ pushInstrsWithoutZero
-    ++ dupInstrs
-    ++ swapInstrs
-  where
-    pushInstrsWithoutZero : List (Operation) := [
-      .PUSH1, .PUSH2, .PUSH3, .PUSH4, .PUSH5,
-      .PUSH6, .PUSH7, .PUSH8, .PUSH9, .PUSH10,
-      .PUSH11, .PUSH12, .PUSH13, .PUSH14, .PUSH15,
-      .PUSH16, .PUSH17, .PUSH18, .PUSH19, .PUSH20,
-      .PUSH21, .PUSH22, .PUSH23, .PUSH24, .PUSH25,
-      .PUSH26, .PUSH27, .PUSH28, .PUSH29, .PUSH30,
-      .PUSH31, .PUSH32
-    ]
-    dupInstrs : List (Operation) := [
-      .DUP1, .DUP2, .DUP3, .DUP4, .DUP5,
-      .DUP6, .DUP7, .DUP8, .DUP9, .DUP10,
-      .DUP11, .DUP12, .DUP13, .DUP14, .DUP15,
-      .DUP16
-    ]
-    swapInstrs : List (Operation) := [
-      .SWAP1, .SWAP2, .SWAP3, .SWAP4, .SWAP5,
-      .SWAP6, .SWAP7, .SWAP8, .SWAP9, .SWAP10,
-      .SWAP11, .SWAP12, .SWAP13, .SWAP14, .SWAP15,
-      .SWAP16
-    ]
-
-def Wlow : List (Operation) := [
-  .MUL, .DIV, .SDIV, .MOD, .SMOD, .SIGNEXTEND, .SELFBALANCE
-]
-
-def Wmid : List (Operation) := [
-  .ADDMOD, .MULMOD, .JUMP
-]
-
-def Whigh : List (Operation) := [
-  .JUMPI
-]
-
-def Wcopy : List (Operation) := [
-  .CALLDATACOPY, .CODECOPY, .RETURNDATACOPY, .MCOPY
-]
-
-def Wcall : List (Operation) := [
-  .CALL, .CALLCODE, .DELEGATECALL, .STATICCALL
-]
-
-def Wextaccount : List (Operation) := [
-  .BALANCE, .EXTCODESIZE, .EXTCODEHASH
-]
-
-end InstructionGasGroups
-
 section Gas
 
-open GasConstants InstructionGasGroups
+open GasConstants
 
 /--
 (328)

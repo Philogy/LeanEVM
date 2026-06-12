@@ -730,41 +730,14 @@ abbrev REVERT       : Operation := .System .REVERT
 abbrev INVALID      : Operation := .System .INVALID
 abbrev SELFDESTRUCT : Operation := .System .SELFDESTRUCT
 
-def isPush : Operation → Bool
-  | .Push _ => true
-  | _ => false
-
 def isJump : Operation → Bool
   | .JUMP => true
   | .JUMPI => true
   | _ => false
 
-def isPC : Operation → Bool
-  | .PC => true
-  | _ => false
-
-def isJumpdest : Operation → Bool
-  | .JUMPDEST => true
-  | _ => false
-
-def isDup : Operation → Bool
-  | .Dup _ => true
-  | _ => false
-
-def isSwap : Operation → Bool
-  | .Exchange _ => true
-  | _ => false
-
 def isCreate : Operation → Bool
   | .CREATE => true
   | .CREATE2 => true
-  | _ => false
-
-def isCall : Operation → Bool
-  | .CALL => true
-  | .CALLCODE => true
-  | .DELEGATECALL => true
-  | .STATICCALL => true
   | _ => false
 
 

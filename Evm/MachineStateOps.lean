@@ -29,9 +29,6 @@ def M (s f l : ℕ) : ℕ :=
     -- The addition is not subject to s²⁵⁶ division (at least that's what MSTORE suggests)
     max s ((f + l + 31) / 32)
 
-def x : ByteArray := "hello".toUTF8
-def y : ByteArray := "kokusho".toUTF8
-
 def writeWord (self : MachineState) (addr val : UInt256) : MachineState :=
   let numOctets := 32
   let source : ByteArray := val.toByteArray
@@ -81,14 +78,8 @@ section ReturnData
 def setReturnData (self : MachineState) (r : ByteArray) : MachineState :=
   { self with returnData := r }
 
-def setHReturn (self : MachineState) (r : ByteArray) : MachineState :=
-  { self with H_return := r }
-
 def returndatasize (self : MachineState) : UInt256 :=
   .ofNat self.returnData.size
-
-def returndataat (self : MachineState) (pos : UInt256) : UInt8 :=
-  self.returnData.data.getD pos.toNat 0
 
 def returndatacopy (self : MachineState) (mstart rstart size : UInt256) : MachineState :=
   let self := writeBytes self.returnData rstart.toNat self mstart.toNat size.toNat
@@ -122,10 +113,6 @@ def keccak256 (self : MachineState) (mstart s : UInt256) : UInt256 × MachineSta
   (.ofNat (fromByteArrayBigEndian kec), newMachineState)
 
 section Gas
-
-def mkNewWithGas (gas : ℕ) : MachineState :=
-  let init : MachineState := default
-  { init with gasAvailable := .ofNat gas }
 
 end Gas
 

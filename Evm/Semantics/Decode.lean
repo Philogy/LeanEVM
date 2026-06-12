@@ -61,10 +61,6 @@ def decode (arr : ByteArray) (pc : UInt256) :
     else .some (Evm.uInt256OfByteArray (arr.extract' pc.toNat.succ (pc.toNat.succ + argWidth)), argWidth)
   )
 
-def fetchInstr (I : Evm.ExecutionEnv) (pc : UInt256) :
-               Except ExecutionException (Operation × Option (UInt256 × Nat)) :=
-  decode I.code pc |>.option (.error .StackUnderflow) Except.ok
-
 partial def D_J_aux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
   match c.get? i.toNat >>= Evm.parseInstr with
     | none => result

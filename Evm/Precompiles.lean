@@ -191,24 +191,6 @@ def Ξ_EXPMOD
         expmod_zeroes ++ expmod_base
     (true, σ, g - .ofNat gᵣ, A, o)
 
-private def expmodOutput :=
-  let (_, _, _, _, o) :=
-    Ξ_EXPMOD
-      default
-      3000
-      default
-      { (default : ExecutionEnv) with
-        calldata := l_B ++ l_E ++ l_M ++ B ++ E ++ M
-      }
-  o
- where
-  l_B : ByteArray := UInt256.toByteArray 2
-  l_E : ByteArray := UInt256.toByteArray 1
-  l_M : ByteArray := UInt256.toByteArray 1
-  B : ByteArray := ⟨#[1, 0]⟩ -- 2^8
-  E : ByteArray := ⟨#[2]⟩
-  M : ByteArray := ⟨#[100]⟩
-
 def Ξ_BN_ADD
   (σ : AccountMap)
   (g : UInt256)
@@ -231,36 +213,6 @@ def Ξ_BN_ADD
       | .error e =>
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
-
-private def bn_addOutput₀ :=
-  let (_, _, _, _, o) :=
-    Ξ_BN_ADD
-      default
-      3000
-      default
-      { (default : ExecutionEnv) with
-        calldata := x₁ ++ y₁ ++ x₂ ++ y₂
-      }
-  o
- where
-  x₁ : ByteArray := UInt256.toByteArray 0
-  y₁ : ByteArray := UInt256.toByteArray 0
-  x₂ : ByteArray := UInt256.toByteArray 1
-  y₂ : ByteArray := UInt256.toByteArray 2
-
-private def bn_addOutput₁ :=
-  let (_, _, _, _, o) :=
-    Ξ_BN_ADD
-      default
-      3000
-      default
-      { (default : ExecutionEnv) with
-        calldata := bn_addOutput₀ ++ x ++ y
-      }
-  o
- where
-  x : ByteArray := UInt256.toByteArray 1
-  y : ByteArray := UInt256.toByteArray 2
 
 def Ξ_BN_MUL
   (σ : AccountMap)
@@ -285,21 +237,6 @@ def Ξ_BN_MUL
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
 
-private def bn_mulOutput :=
-  let (_, _, _, _, o) :=
-    Ξ_BN_MUL
-      default
-      100000
-      default
-      { (default : ExecutionEnv) with
-        calldata := x₁ ++ y₁ ++ n
-      }
-  o
- where
-  x₁ : ByteArray := UInt256.toByteArray 1
-  y₁ : ByteArray := UInt256.toByteArray 2
-  n  : ByteArray := UInt256.toByteArray 2
-
 def Ξ_SNARKV
   (σ : AccountMap)
   (g : UInt256)
@@ -320,20 +257,6 @@ def Ξ_SNARKV
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
         (false, ∅, 0, A, .empty)
-
-private def snarkvOutput :=
-  let (_, _, _, _, o) :=
-    Ξ_SNARKV
-      default
-      100000
-      default
-      { (default : ExecutionEnv) with
-        calldata := x ++ y ++ ffi.ByteArray.zeroes ⟨32 * 4⟩
-      }
-  o
- where
-  x : ByteArray := UInt256.toByteArray 1
-  y : ByteArray := UInt256.toByteArray 2
 
 def Ξ_BLAKE2_F
   (σ : AccountMap)

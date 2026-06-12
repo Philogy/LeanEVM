@@ -37,8 +37,6 @@ def initialiseAccount (addr : AccountAddress) : ExecutionState → ExecutionStat
 def updateAccount (addr : AccountAddress) (act : Account) : ExecutionState → ExecutionState :=
   Evm.State.updateAccount addr act
 
-def isEmpty (self : ExecutionState) : Bool := self.toState.accountMap == ∅
-
 end ExecutionState
 
 

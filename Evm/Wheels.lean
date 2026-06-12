@@ -77,7 +77,6 @@ section
 
 open NaryNotation
 
-def Nullary    := !nary[UInt256 ^ 0]
 def Unary      := !nary[UInt256 ^ 1]
 def Binary     := !nary[UInt256 ^ 2]
 def Ternary    := !nary[UInt256 ^ 3]
@@ -144,8 +143,6 @@ def ByteArray.extract' (a : ByteArray) (b e : Nat) : ByteArray :=
   else ⟨⟨a.toList.drop b |>.take (e - b)⟩⟩
 
 def HexPrefix := "0x"
-
-def TargetSchedule := "Cancun"
 
 def isHexDigitChar (c : Char) : Bool :=
   '0' <= c && c <= '9' || 'a' <= c.toLower && c.toLower <= 'f'
@@ -341,8 +338,6 @@ def RLP (t : 𝕋) : Option ByteArray :=
     | .𝕃 l => R_l l
 
 end
-
-def myByteArray : ByteArray := ⟨#[1, 2, 3]⟩
 
 def ByteArray.write
   (source : ByteArray)

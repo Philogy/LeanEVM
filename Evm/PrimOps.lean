@@ -38,14 +38,6 @@ def execTriOp (f : Primop.Ternary) : Transformer :=
       | _ =>
         .error .StackUnderflow
 
-def execQuadOp (f : Primop.Quaternary) : Transformer :=
-  λ s ↦
-    match s.stack.pop4 with
-      | some ⟨ stack , μ₀ , μ₁ , μ₂, μ₃ ⟩ => Id.run do
-        .ok <| s.replaceStackAndIncrPC (stack.push <| f μ₀ μ₁ μ₂ μ₃)
-      | _ =>
-        .error .StackUnderflow
-
 def executionEnvOp (op : ExecutionEnv → UInt256) : Transformer :=
   λ evmState ↦ Id.run do
     let result := op evmState.executionEnv

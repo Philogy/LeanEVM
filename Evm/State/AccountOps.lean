@@ -32,16 +32,6 @@ EMPTY(σ, a). Section 4.1., equation 14.
 def emptyAccount (self : Account) : Bool :=
   self.code.isEmpty ∧ self.nonce = 0 ∧ self.balance = 0
 
-def addBalance (self : Account) (balance : UInt256) : Option (Account) :=
-  let overflow : Bool := self.balance + balance < self.balance
-  if overflow then .none
-  else .some { self with balance := self.balance + balance }
-
-def subBalance (self : Account) (balance : UInt256) : Option (Account) :=
-  let underflow : Bool := self.balance < balance
-  if underflow then .none
-  else .some { self with balance := self.balance - balance }
-
 end Account
 
 end Evm

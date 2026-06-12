@@ -34,15 +34,9 @@ def updateAccount (addr : AccountAddress) (act : Account) (self : State) : State
 def setAccount (self : State) (addr : AccountAddress) (acc : Account) : State :=
   { self with accountMap := self.accountMap.insert addr acc }
 
-def setSelfAccount (self : State) (acc : Account := default) : State :=
-  self.setAccount self.executionEnv.codeOwner acc
-
 def updateAccount! (self : State) (addr : AccountAddress) (f : Account → Account) : State :=
   let acc! := self.lookupAccount addr |>.getD default
   self.setAccount addr (f acc!)
-
-def updateSelfAccount! (self : State) : (Account → Account) → State :=
-  self.updateAccount! self.executionEnv.codeOwner
 
 def balance (self : State) (k : UInt256) : State × UInt256 :=
   let addr := AccountAddress.ofUInt256 k
@@ -56,12 +50,6 @@ def calldataload (self : State) (v : UInt256) : UInt256 :=
 
 def setNonce! (self : State) (addr : AccountAddress) (nonce : UInt256) : State :=
   self.updateAccount! addr (λ acc ↦ { acc with nonce := nonce })
-
-def setSelfNonce! (self : State) (nonce : UInt256) : State :=
-  self.setNonce! self.executionEnv.codeOwner nonce
-
-def selfStorage! (self : State) : Storage :=
-  self.lookupAccount self.executionEnv.codeOwner |>.getD default |>.storage
 
 section CodeCopy
 
@@ -108,18 +96,12 @@ def chainId (_ : State) : UInt256 := .ofNat Evm.chainId
 def selfbalance (self : State) : UInt256 :=
   Batteries.RBMap.find? self.accountMap self.executionEnv.codeOwner |>.elim 0 (·.balance)
 
-def setCode (self : State) (code : ByteArray) : State :=
-  { self with executionEnv.code := code }
-
 end Blocks
 
 section Storage
 
 def setStorage! (self : State) (addr : AccountAddress) (strg : Storage) : State :=
   self.updateAccount! addr (λ acc ↦ { acc with storage := strg })
-
-def setSelfStorage! (self : State) : Storage → State :=
-  self.setStorage! self.executionEnv.codeOwner
 
 def sload (self : State) (spos : UInt256) : State × UInt256 :=
   let Iₐ := self.executionEnv.codeOwner

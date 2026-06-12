@@ -60,11 +60,6 @@ def Post.toEVMState : Post → ExecutionState := PersistentAccountMap.toEVMState
 local instance : Inhabited Transformer where
   default := λ _ ↦ default
 
-private def compareWithEVMdefaults (s₁ s₂ : Evm.Storage) : Bool :=
-  withDefault s₁ == withDefault s₂
-  where
-    withDefault (s : Evm.Storage) : Evm.Storage := if s.contains 0 then s else s.insert 0 0
-
 /--
 TODO - This should be a generic map complement, but we are not trying to write a library here.
 
@@ -665,35 +660,6 @@ def processSingleTest (path : System.FilePath) (file : Lean.Json) (testName : St
       return (#[], #[(testId, res, t1 - t0)])
     else
       return (#[], #[])
-
-/--
-Run all (non-filtered) tests of a single fixture file. The file is read and
-parsed exactly once — scheduling is per-file so a fixture is never re-parsed
-per test.
--/
-def processTestFile (path : System.FilePath) (isToBeTested : String → Bool)
-                    (isTimed : Option Nat := .none)
-                    (abort : Option (IO.Ref Bool) := .none) :
-                    IO (Array TestId × Array (TestId × TestResult × Nat)) := do
-  let mut discarded : Array TestId := .empty
-  let mut results : Array (TestId × TestResult × Nat) := .empty
-  let file ← Lean.Json.fromFile path
-  let testNames := (Parser.testNamesOfTest file).toOption.getD #[] |>.filter isToBeTested
-  for testName in testNames do
-    if let some a := abort then
-      if ← a.get then return (discarded, results)
-    let testId : TestId := (path, testName)
-    let test := Except.mapError Conform.Exception.CannotParse <| file.getObjValAs? TestEntry testName
-    match test with
-    | .error _ => IO.eprintln s!"Cannot parse: {testId}"
-                  discarded := discarded.push testId
-    | .ok test => if test.network.startsWith "Cancun"
-                  then do
-                    let t₀ ← IO.monoMsNow
-                    let res ← processTest test <| isTimed <&> (·, testId)
-                    let t₁ ← IO.monoMsNow
-                    results := results.push (testId, res, t₁ - t₀)
-  return (discarded, results)
 
 end Conform
 

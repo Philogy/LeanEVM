@@ -1,18 +1,7 @@
 import Conform.TestRunner
 import Evm.FFI.ffi
 
-def TestsSubdir : System.FilePath := "BlockchainTests"
 def isTestFile (file : System.FilePath) : Bool := file.extension.option false (· == "json")
-
-private def basicSuccess (name : System.FilePath)
-                         (result : Batteries.RBMap String Evm.Conform.TestResult compare) : IO Bool := do
-  if result.all (λ _ v ↦ v.isNone)
-  then IO.println s!"SUCCESS! - {name}"; pure true
-  else pure false
-
-private def success (result : Batteries.RBMap String Evm.Conform.TestResult compare) : Array String × Array String :=
-  let (succeeded, failed) := result.partition (λ _ v ↦ v.isNone)
-  (succeeded.keys, failed.keys)
 
 def logFile (phase : ℕ) : System.FilePath := s!"tests_{phase}.txt"
 

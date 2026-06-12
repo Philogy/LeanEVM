@@ -91,11 +91,6 @@ unsafe def report [Inhabited β] (s : String) (f : α → β) (a : α) : β :=
   dbg_trace s!"END: {s}"
   unsafeIO res |>.toOption.get!
 
-def testJsonParser (α : Type) [Repr α] [Lean.FromJson α] (s : String) : String :=
-  match Lean.FromJson.fromJson? (α := α) <| (Lean.Json.parse s).toOption.getD Lean.Json.null with
-    | .error e  => s!"err: {e}"
-    | .ok    ok => s!"ok: {repr ok}"
-
 end
 
 end DebuggingAndProfiling

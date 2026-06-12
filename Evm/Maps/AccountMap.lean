@@ -72,25 +72,6 @@ def toExecute (σ : AccountMap) (t : AccountAddress) : ToExecute :=
     let .some tDirect := σ.find? t | ToExecute.Code default
     ToExecute.Code tDirect.code
 
-def L_S (σ : PersistentAccountMap) : Array (ByteArray × ByteArray) :=
-  σ.foldl
-    (λ arr (addr : AccountAddress) acc ↦
-      arr.push (p addr acc)
-    )
-    .empty
- where
-  p (addr : AccountAddress) (acc : PersistentAccountState) : ByteArray × ByteArray :=
-    (ffi.KEC addr.toByteArray, rlp acc)
-  rlp (acc : PersistentAccountState) :=
-    Option.get! <|
-      RLP <|
-        .𝕃
-          [ .𝔹 (BE acc.nonce.toNat)
-          , .𝔹 (BE acc.balance.toNat)
-          , .𝔹 <| (computeTrieRoot acc.storage).getD .empty
-          , .𝔹 acc.codeHash.toByteArray
-          ]
-
 /--
 The secured state trie root. The whole computation (per-account storage
 roots, account RLP, state trie) happens in a single `evmrs state-root`

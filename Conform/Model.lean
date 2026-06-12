@@ -94,14 +94,9 @@ namespace TestResult
 
 def isSuccess (self : TestResult) : Bool := self matches none
 
-def isFailure (self : TestResult) : Bool := !self.isSuccess
-
 def mkFailed (reason : String := "") : TestResult := .some reason
 
 def mkSuccess : TestResult := .none
-
-def ofBool (success : Bool) (reason : String := "Semantics error.") : TestResult :=
-  if success then mkSuccess else mkFailed reason
 
 end TestResult
 
