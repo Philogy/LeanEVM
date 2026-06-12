@@ -4,7 +4,7 @@ open Lake DSL System
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4.git"@"v4.30.0"
 
-package «evmyul» {
+package «evm» {
   moreLeanArgs := #["-DautoImplicit=false"]
   moreServerOptions := #[⟨`autoImplicit, false⟩]
 }
@@ -27,7 +27,7 @@ target ffi.o pkg : FilePath := do
   let sha2 ← (←cloneSha2.fetch).await
   let keccak256 ← (←cloneKeccak256.fetch).await
   let oFile := pkg.buildDir / "ffi.o"
-  let srcJob ← inputTextFile <| pkg.dir / "EvmYul" / "FFI" / "ffi.c"
+  let srcJob ← inputTextFile <| pkg.dir / "Evm" / "FFI" / "ffi.c"
   let weakArgs := #[
     "-I", (← getLeanIncludeDir).toString,
     "-I", sha2.dir.toString,
@@ -78,7 +78,7 @@ target evmrs pkg : FilePath := do
 lean_lib «Conform»
 
 @[default_target]
-lean_lib «EvmYul»
+lean_lib «Evm»
 
 @[test_driver]
 lean_exe «conform» where

@@ -1,6 +1,6 @@
-import EvmYul.EVM.Exception
+import Evm.Exception
 
-namespace EvmYul
+namespace Evm
 
 namespace Conform
 
@@ -16,4 +16,4 @@ inductive Exception where
 
 end Conform
 
-end EvmYul
+end Evm

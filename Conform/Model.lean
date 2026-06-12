@@ -1,17 +1,17 @@
 import Lean.Data.RBMap
 import Lean.Data.Json
 
--- import EvmYul.Maps
-import EvmYul.Operations
-import EvmYul.Wheels
-import EvmYul.State.Withdrawal
-import EvmYul.State.Block
+-- import Evm.Maps
+import Evm.Operations
+import Evm.Wheels
+import Evm.State.Withdrawal
+import Evm.State.Block
 
-import EvmYul.EVM.State
+import Evm.ExecutionState
 
 import Conform.Wheels
 
-namespace EvmYul
+namespace Evm
 
 namespace Conform
 
@@ -40,7 +40,7 @@ instance : IsAntisymm ((_ : UInt256) × UInt256) (· ≤ ·) where
     obtain ⟨a₁, a₂⟩ := a
     obtain ⟨b₁, b₂⟩ := b
     simp only [LE.le, sigmaLe] at h₁ h₂
-    grind [EvmYul.UInt256.toNat_inj]
+    grind [Evm.UInt256.toNat_inj]
 
 instance : IsTotal ((_ : UInt256) × UInt256) (· ≤ ·) where
   total a b := by
@@ -62,7 +62,7 @@ abbrev Withdrawals := Array Withdrawal
 private local instance : Repr Json := ⟨λ s _ ↦ Json.pretty s⟩
 
 /--
-In theory, parts of the TestEntry could deserialise immediately into the underlying `EVM.State`.
+In theory, parts of the TestEntry could deserialise immediately into the underlying `ExecutionState`.
 -/
 
 inductive PostState where

@@ -42,4 +42,4 @@ uv pip install --python .venv/bin/python3 coincurve pycryptodome typing-extensio
 
 Prefer `grind`; avoid axiom-introducing tactics (`native_decide`). `bv_decide`
 also depends on `ofReduceBool` — fallback only, currently used solely for the
-`UInt256` limb/`BitVec 256` equivalence theorems in `EvmYul/UInt256.lean`.
+`UInt256` limb/`BitVec 256` equivalence theorems in `Evm/UInt256.lean`.

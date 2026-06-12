@@ -1,21 +1,21 @@
-import EvmYul.EVM.State
-import EvmYul.EVM.Semantics
-import EvmYul.EVM.Gas
-import EvmYul.Wheels
+import Evm.ExecutionState
+import Evm.Semantics
+import Evm.Gas
+import Evm.Wheels
 
-import EvmYul.State.TransactionOps
-import EvmYul.State.Withdrawal
+import Evm.State.TransactionOps
+import Evm.State.Withdrawal
 
-import EvmYul.Maps.AccountMap
+import Evm.Maps.AccountMap
 
-import EvmYul.Pretty
-import EvmYul.Wheels
+import Evm.Pretty
+import Evm.Wheels
 
 import Conform.Exception
 import Conform.Model
 import Conform.TestParser
 
-namespace EvmYul
+namespace Evm
 
 namespace Conform
 
@@ -38,7 +38,7 @@ def PersistentAccountMap.toAccountMap (self : PersistentAccountMap) : AccountMap
       }
     s.insert addr account
 
-def PersistentAccountMap.toEVMState (self : PersistentAccountMap) : EVM.State :=
+def PersistentAccountMap.toEVMState (self : PersistentAccountMap) : ExecutionState :=
   self.foldl addAccount default
   where addAccount s addr acc :=
     let account : Account :=
@@ -51,19 +51,19 @@ def PersistentAccountMap.toEVMState (self : PersistentAccountMap) : EVM.State :=
       }
     { s with toState := s.setAccount addr account }
 
-def Pre.toEVMState : Pre → EVM.State := PersistentAccountMap.toEVMState
+def Pre.toEVMState : Pre → ExecutionState := PersistentAccountMap.toEVMState
 
 def TestMap.toTests (self : TestMap) : List (String × TestEntry) := self.toList
 
-def Post.toEVMState : Post → EVM.State := PersistentAccountMap.toEVMState
+def Post.toEVMState : Post → ExecutionState := PersistentAccountMap.toEVMState
 
-local instance : Inhabited EVM.Transformer where
+local instance : Inhabited Transformer where
   default := λ _ ↦ default
 
-private def compareWithEVMdefaults (s₁ s₂ : EvmYul.Storage) : Bool :=
+private def compareWithEVMdefaults (s₁ s₂ : Evm.Storage) : Bool :=
   withDefault s₁ == withDefault s₂
   where
-    withDefault (s : EvmYul.Storage) : EvmYul.Storage := if s.contains 0 then s else s.insert 0 0
+    withDefault (s : Evm.Storage) : Evm.Storage := if s.contains 0 then s else s.insert 0 0
 
 /--
 TODO - This should be a generic map complement, but we are not trying to write a library here.
@@ -114,14 +114,14 @@ end
 def executeTransaction
   (transaction : Transaction)
   (sender : AccountAddress)
-  (s : EVM.State)
+  (s : ExecutionState)
   (header : BlockHeader)
-  : Except EVM.Exception EVM.State
+  : Except Evm.Exception ExecutionState
 := do
   let _fuel : ℕ := s.accountMap.find? sender |>.elim 0 (·.balance) |>.toNat
 
   let (ypState, substate, statusCode, totalGasUsed) ←
-    EVM.Υ _fuel
+    Υ _fuel
       s.accountMap
       header.baseFeePerGas
       header
@@ -132,7 +132,7 @@ def executeTransaction
 
   -- as EIP 4788 (https://eips.ethereum.org/EIPS/eip-4788).
 
-  let result : EVM.State :=
+  let result : ExecutionState :=
     { s with
       accountMap := ypState
       totalGasUsedInBlock := s.totalGasUsedInBlock + totalGasUsed.toNat
@@ -155,7 +155,7 @@ def executeTransaction
 def validateHeaderBeforeTransactions
   (blocks : ProcessedBlocks)
   (header : BlockHeader)
-  : Except EVM.Exception ProcessedBlock
+  : Except Evm.Exception ProcessedBlock
 := do
   if header.parentHash = 0 then
     throw <| .BlockException .UNKNOWN_PARENT_ZERO
@@ -198,7 +198,7 @@ def validateTransaction
   (totalGasUsedInBlock : ℕ)
   (T : Transaction)
   (senderHint : Option AccountAddress := none)
-  : Except EVM.Exception AccountAddress
+  : Except Evm.Exception AccountAddress
 := do
   let H_f := header.baseFeePerGas
   if T.base.gasLimit.toNat + totalGasUsedInBlock > header.gasLimit then
@@ -219,7 +219,7 @@ def validateTransaction
   if H_f > maxFeePerGas.toNat then
     throw <| .TransactionException .INSUFFICIENT_MAX_FEE_PER_GAS
 
-  let g₀ : ℕ := EVM.intrinsicGas T
+  let g₀ : ℕ := intrinsicGas T
   if T.base.gasLimit.toNat < g₀ then
     throw <| .TransactionException .INTRINSIC_GAS_TOO_LOW
   match T with
@@ -289,7 +289,7 @@ def validateTransaction
     match σ.find? S_T with
       | some sender => (sender.code, sender.nonce, sender.balance)
       | none =>
-        dbg_trace s!"could not find sender {EvmYul.toHex S_T.toByteArray}"
+        dbg_trace s!"could not find sender {Evm.toHex S_T.toByteArray}"
         (.empty, 0, 0)
 
   if senderCode ≠ .empty then throw <| .TransactionException .SENDER_NOT_EOA
@@ -315,7 +315,7 @@ def validateTransaction
   pure S_T
 
  where
-  L_X (T : Transaction) : Except EVM.Exception 𝕋 := -- (317)
+  L_X (T : Transaction) : Except Evm.Exception 𝕋 := -- (317)
     let accessEntryRLP : AccountAddress × Array UInt256 → 𝕋
       | ⟨a, s⟩ => .𝕃 [.𝔹 a.toByteArray, .𝕃 (s.map (.𝔹 ∘ UInt256.toByteArray)).toList]
     let accessEntriesRLP (aEs : List (AccountAddress × Array UInt256)) : 𝕋 :=
@@ -392,10 +392,10 @@ def validateTransaction
           ]
 
 def validateBlock
-  (state : EVM.State)
+  (state : ExecutionState)
   (parentHeader : BlockHeader)
   (block : DeserializedBlock)
-  : Except EVM.Exception Unit
+  : Except Evm.Exception Unit
 := do
 
   let MAX_BLOB_GAS_PER_BLOCK := 786432
@@ -465,7 +465,7 @@ def validateBlock
   pure ()
 
 def deserializeRawBlock (rawBlock : RawBlock)
-  : Except EVM.Exception DeserializedBlock
+  : Except Evm.Exception DeserializedBlock
 := do
   let (blockHash, blockHeader, transactions, withdrawals) ←
     deserializeBlock rawBlock.rlp (computeRoots := ¬rawBlock.exception.isEmpty)
@@ -478,7 +478,7 @@ def processBlocks
   (pre : Pre)
   (blocks : RawBlocks)
   (genesisRLP : ByteArray)
-  : Except EVM.Exception EVM.State
+  : Except Evm.Exception ExecutionState
 := do
   let (genesisHash, genesisBlockHeader, _) ← deserializeBlock genesisRLP (computeRoots := false)
   let state₀ :=
@@ -522,9 +522,9 @@ def processBlocks
   pure state
  where
   processBlock
-    (s₀ : EVM.State)
+    (s₀ : ExecutionState)
     (block : DeserializedBlock)
-    : Except EVM.Exception EVM.State
+    : Except Evm.Exception ExecutionState
   := do
     -- Beacon call
     let s ← do
@@ -539,7 +539,7 @@ def processBlocks
           let _fuel := 2^14
           -- the call does not count against the block’s gas limit
           let beaconCallResult :=
-            EVM.Θ _fuel
+            Θ _fuel
               []
               .empty
               s₀.genesisBlockHeader
@@ -594,7 +594,7 @@ def processBlocks
 NB we can throw away the final state if it coincided with the expected one, hence `.none`.
 -/
 def preImpliesPost (entry : TestEntry)
-  : Except EVM.Exception (Option (PersistentAccountMap))
+  : Except Evm.Exception (Option (PersistentAccountMap))
 := do
     let resultState ← processBlocks entry.pre entry.blocks entry.genesisRLP
     let lastAccountMap :=
@@ -622,7 +622,7 @@ instance (priority := high) : Repr (PersistentAccountMap) := ⟨λ m _ ↦
   Id.run do
     let mut result := ""
     for (k, v) in m do
-      result := result ++ s!"\nAccount[...{(EvmYul.toHex k.toByteArray) /-|>.takeRight 5-/}]\n"
+      result := result ++ s!"\nAccount[...{(Evm.toHex k.toByteArray) /-|>.takeRight 5-/}]\n"
       result := result ++ s!"balance: {v.balance}\nnonce: {v.nonce}\nstorage: \n"
       for (sk, sv) in v.storage do
         result := result ++ s!"{sk} → {sv}\n"
@@ -647,7 +647,7 @@ def processTest (entry : TestEntry) (isTimed : Option (Nat × TestId) := .none) 
               let (postSubActual, actualSubPost) := storageΔ post σ
               s!"\npost / actual: {repr postSubActual} \nactual / post: {repr actualSubPost}"
             | .Hash h =>
-              s!"\npost: {EvmYul.toHex h} \nactual: {EvmYul.toHex <$> stateTrieRoot σ}"
+              s!"\npost: {Evm.toHex h} \nactual: {Evm.toHex <$> stateTrieRoot σ}"
         errorF := if verbose then verboseError else discardError
 
 /--
@@ -674,4 +674,4 @@ def processTestFile (path : System.FilePath) (isToBeTested : String → Bool)
 
 end Conform
 
-end EvmYul
+end Evm

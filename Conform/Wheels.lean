@@ -1,6 +1,6 @@
 import Lean.Data.Json
-import EvmYul.UInt256
-import EvmYul.Wheels
+import Evm.UInt256
+import Evm.Wheels
 import Batteries.Data.RBMap
 
 import Mathlib.Data.Multiset.Sort
@@ -45,7 +45,7 @@ def fromFile (path : System.FilePath) : IO Json := do
 
 end Lean.Json
 
-namespace EvmYul
+namespace Evm
 
 namespace Conform
 
@@ -100,7 +100,7 @@ end
 
 end DebuggingAndProfiling
 
-end EvmYul
+end Evm
 
 def computeToList! {α}
                    [LE α] [IsTrans α (· ≤ ·)] [IsAntisymm α (· ≤ ·)] [IsTotal α (· ≤ ·)]

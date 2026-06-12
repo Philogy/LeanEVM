@@ -1,26 +1,26 @@
 import Conform.TestRunner
-import EvmYul.FFI.ffi
+import Evm.FFI.ffi
 
 def TestsSubdir : System.FilePath := "BlockchainTests"
 def isTestFile (file : System.FilePath) : Bool := file.extension.option false (· == "json")
 
 private def basicSuccess (name : System.FilePath)
-                         (result : Batteries.RBMap String EvmYul.Conform.TestResult compare) : IO Bool := do
+                         (result : Batteries.RBMap String Evm.Conform.TestResult compare) : IO Bool := do
   if result.all (λ _ v ↦ v.isNone)
   then IO.println s!"SUCCESS! - {name}"; pure true
   else pure false
 
-private def success (result : Batteries.RBMap String EvmYul.Conform.TestResult compare) : Array String × Array String :=
+private def success (result : Batteries.RBMap String Evm.Conform.TestResult compare) : Array String × Array String :=
   let (succeeded, failed) := result.partition (λ _ v ↦ v.isNone)
   (succeeded.keys, failed.keys)
 
 def logFile (phase : ℕ) : System.FilePath := s!"tests_{phase}.txt"
 
-open EvmYul.Conform in
+open Evm.Conform in
 instance : ToString TestResult where
   toString tr := tr.elim "Success." id
 
-open EvmYul.Conform in
+open Evm.Conform in
 def log (testFile : System.FilePath) (testName : String) (result : TestResult) (phase : ℕ := 0) : IO Unit :=
   IO.FS.withFile (logFile phase) .append λ h ↦ h.putStrLn s!"{testFile.fileName.get!}[{testName}] - {result}\n"
 
@@ -39,7 +39,7 @@ def testFiles (root               : System.FilePath)
               (timed              : Bool := false) : IO (Nat × Array String) := do
   let isToBeTested (testname : String) : Bool :=
     let whitelist := testWhitelist
-    let blacklist := testBlacklist ++ EvmYul.Conform.GlobalBlacklist
+    let blacklist := testBlacklist ++ Evm.Conform.GlobalBlacklist
     testname ∉ blacklist ∧ (whitelist.isEmpty ∨ testname ∈ whitelist)
 
   let testFiles ←
@@ -50,7 +50,7 @@ def testFiles (root               : System.FilePath)
   let testFiles := testFiles.filter
     λ f ↦ fileFilter.isEmpty || (f.toString.splitOn fileFilter).length != 1
 
-  let mut discardedFiles : Array EvmYul.Conform.TestId := #[]
+  let mut discardedFiles : Array Evm.Conform.TestId := #[]
   let mut numSuccess := 0
 
   if ←System.FilePath.pathExists (logFile phase) then IO.FS.removeFile (logFile phase)
@@ -62,7 +62,7 @@ def testFiles (root               : System.FilePath)
   IO.println s!"Scheduling {testFiles.size} test files for parallel execution..."
   for path in testFiles do
     tasks := tasks.push
-      (←IO.asTask <| EvmYul.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none))
+      (←IO.asTask <| Evm.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none))
 
   let mut failedTests : Array String := .empty
 

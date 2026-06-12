@@ -1,15 +1,15 @@
 import Lean.Data.Json
 
-import EvmYul.Wheels
-import EvmYul.Operations
-import EvmYul.EVM.Semantics
-import EvmYul.Wheels
-import EvmYul.State.Withdrawal
+import Evm.Wheels
+import Evm.Operations
+import Evm.Semantics
+import Evm.Wheels
+import Evm.State.Withdrawal
 
 import Conform.Model
 import Conform.Wheels
 
-namespace EvmYul
+namespace Evm
 
 namespace Conform
 
@@ -208,4 +208,4 @@ end Parser
 
 end Conform
 
-end EvmYul
+end Evm
