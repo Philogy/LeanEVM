@@ -20,11 +20,12 @@ the system or user site-packages, never `--break-system-packages`.
 
 ## Conform suite notes
 
-  from a measured tier). The full suite is for phase gates only, with user
-  sign-off. Phase 1 (22,302 tests) finishes inside one 300s-capped run on 8
-  threads. Remaining stragglers: `vmPerformance/` (phase 2; loopMul
-  ~145s/test, raw 256-bit arithmetic) and parts of the `DelayFiles` list in
-  `Conform/Main.lean`.
+- **Never run a test sample without first proving it runs ≤30s** (estimate
+  from a measured tier). Full runs are for phase gates only, with user
+  sign-off. The default `lake exe conform 8` runs the conformance phase only
+  (22,308 tests, ~2 min wall on 8 threads). `--perf` additionally runs the
+  throughput stress tests (`vmPerformance/` + blake2f max rounds — minutes
+  per test, raw 256-bit arithmetic, no extra semantic coverage).
 - A second CLI arg substring-filters fixture file paths for quick samples:
   `lake exe conform 8 stMemoryTest`.
 - `nproc` does not exist on macOS; always pass an explicit thread count.
