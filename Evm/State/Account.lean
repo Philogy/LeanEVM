@@ -12,7 +12,7 @@ namespace Evm
   Precompiled contract addresses.
   (142) `π ≡ {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}`
 -/
-def π : Batteries.RBSet AccountAddress compare :=
+def precompileAddresses : Batteries.RBSet AccountAddress compare :=
   Batteries.RBSet.ofList ((List.range 11).tail.map (Fin.ofNat _)) compare
 
 inductive ToExecute where

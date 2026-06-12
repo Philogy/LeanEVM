@@ -13,8 +13,8 @@ namespace Evm
 
 open Batteries (RBMap RBSet)
 
--- Type Υ using \Upsilon or \GU
-def Υ
+/-- Execute one transaction — the YP's `Υ` (section 6). -/
+def executeTransaction
   (σ : AccountMap)
   (H_f : ℕ)
   (H : BlockHeader)
@@ -58,7 +58,7 @@ def Υ
     let eₛ ← Eₛ.toList
     pure (Eₐ, eₛ)
   let a := -- (80)
-    A0.accessedAccounts.insert S_T
+    initialSubstate.accessedAccounts.insert S_T
       |>.insert H.beneficiary
       |>.union <| Batteries.RBSet.ofList (accessList.map Prod.fst) compare
   -- (81)
@@ -68,7 +68,7 @@ def Υ
       | some t => a.insert t
       | none => a
   let AStar := -- (77)
-    { A0 with accessedAccounts := AStarₐ, accessedStorageKeys := Batteries.RBSet.ofList AStar_K Substate.storageKeysCmp}
+    { initialSubstate with accessedAccounts := AStarₐ, accessedStorageKeys := Batteries.RBSet.ofList AStar_K Substate.storageKeysCmp}
   let (/- provisional state -/ σ_P, g', A, z) ← -- (76)
     match T.base.recipient with
       | none => do

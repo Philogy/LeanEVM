@@ -59,7 +59,7 @@ structure Substate where
 /--
   (63) `A0 ≡ (∅, (), ∅, 0, π, ∅)`
 -/
-def A0 : Substate := { (default : Substate) with accessedAccounts := π }
+def initialSubstate : Substate := { (default : Substate) with accessedAccounts := precompileAddresses }
 
 -- See the Bloom filter function M
 def bloomFilter (a : Array ByteArray) : ByteArray  :=

@@ -16,9 +16,9 @@ import Evm.Crypto.PointEval
 
 import Evm.FFI.ffi
 
-open Evm
+namespace Evm.Precompiles
 
-def Ξ_ECREC
+def ecRecover
   (σ : (AccountMap))
   (g : UInt256)
   (A : Substate)
@@ -50,7 +50,7 @@ def Ξ_ECREC
             .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
-def Ξ_SHA256
+def sha256
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -73,7 +73,7 @@ def Ξ_SHA256
           .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
-def Ξ_RIP160
+def ripemd160
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -96,7 +96,7 @@ def Ξ_RIP160
           .empty
     (true, σ, g - .ofNat gᵣ, A, o)
 
-def Ξ_ID
+def identity
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -134,7 +134,7 @@ def expModAux (m : ℕ) (a : ℕ) (c : ℕ) : ℕ → ℕ
 
 def expMod (m : ℕ) (b : UInt256) (n : ℕ) : ℕ := expModAux m 1 b.toNat n
 
-def Ξ_EXPMOD
+def modExp
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -191,7 +191,7 @@ def Ξ_EXPMOD
         expmod_zeroes ++ expmod_base
     (true, σ, g - .ofNat gᵣ, A, o)
 
-def Ξ_BN_ADD
+def ecAdd
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -214,7 +214,7 @@ def Ξ_BN_ADD
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
 
-def Ξ_BN_MUL
+def ecMul
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -237,7 +237,7 @@ def Ξ_BN_MUL
         -- (σ, g - gᵣ, A, .empty)
         (false, ∅, 0, A, .empty)
 
-def Ξ_SNARKV
+def ecPairing
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -258,7 +258,7 @@ def Ξ_SNARKV
       | .error e =>
         (false, ∅, 0, A, .empty)
 
-def Ξ_BLAKE2_F
+def blake2f
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -278,7 +278,7 @@ def Ξ_BLAKE2_F
       | .error e =>
         (false, ∅, 0, A, .empty)
 
-def Ξ_PointEval
+def pointEvaluation
   (σ : AccountMap)
   (g : UInt256)
   (A : Substate)
@@ -297,3 +297,5 @@ def Ξ_PointEval
       | .ok o => (true, σ, g - .ofNat gᵣ, A, o)
       | .error e =>
         (false, ∅, 0, A, .empty)
+
+end Evm.Precompiles

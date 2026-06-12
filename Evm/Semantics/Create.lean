@@ -10,8 +10,8 @@ import Evm.Crypto.Keccak256
 
 namespace Evm
 
-/-- The address-derivation preimage `L_A` (eq. 96). -/
-private def L_A (s : AccountAddress) (n : UInt256) (ζ : Option ByteArray) (i : ByteArray) :
+/-- The address-derivation preimage `contractAddressBytes` (eq. 96). -/
+private def contractAddressBytes (s : AccountAddress) (n : UInt256) (ζ : Option ByteArray) (i : ByteArray) :
   Option ByteArray
 :=
   let s := s.toByteArray
@@ -34,7 +34,7 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
   -- https://eips.ethereum.org/EIPS/eip-3860
 
   let n : UInt256 := (σ.find? s |>.option 0 (·.nonce)) - 1
-  let some lₐ := L_A s n params.salt params.initCode | .error .StackUnderflow
+  let some lₐ := contractAddressBytes s n params.salt params.initCode | .error .StackUnderflow
   let a : AccountAddress := -- (94) (95)
     (ffi.KEC lₐ).extract 12 32 /- 160 bits = 20 bytes -/
       |> fromByteArrayBigEndian |> Fin.ofNat _
@@ -90,7 +90,7 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
     }
   .ok
     { kind := .create a ⟨createdAccounts, σ, AStar⟩
-      validJumps := D_J i 0
+      validJumps := validJumpDests i 0
       exec :=
         { (default : ExecutionState) with
             accountMap := σStar
@@ -155,7 +155,7 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
 
 /--
 Resume a frame suspended on CREATE/CREATE2: restore the unused gas (the
-parent retained `g − L(g)`), set the return data on failure, push the new
+parent retained `g − allButOneSixtyFourth(g)`), set the return data on failure, push the new
 contract's address (or 0), and advance the pc.
 -/
 def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
@@ -169,7 +169,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
     if z = false ∨ evmState.executionEnv.depth = 1024 ∨ pd.value > balance ∨ pd.initCodeSize > 49152
     then 0 else .ofNat result.address
   let newReturnData : ByteArray := if z then .empty else result.output
-  if (g + g').toNat < L g.toNat then
+  if (g + g').toNat < allButOneSixtyFourth g.toNat then
     throw .OutOfGass
   let exec' :=
     { evmState with
@@ -178,7 +178,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
         createdAccounts := result.createdAccounts
         activeWords := .ofNat <| MachineState.M evmState.activeWords.toNat pd.initOffset.toNat pd.initSize.toNat
         returnData := newReturnData
-        gasAvailable := .ofNat <| g.toNat - L g.toNat + g'.toNat }
+        gasAvailable := .ofNat <| g.toNat - allButOneSixtyFourth g.toNat + g'.toNat }
   return { pd.frame with exec := exec'.replaceStackAndIncrPC (pd.stack.push x) }
 
 end Evm

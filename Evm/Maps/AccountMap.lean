@@ -66,7 +66,7 @@ def AccountMap.transferBalance (σ : AccountMap) (from_addr to_addr : AccountAdd
     | .some σ' => σ'.increaseBalance to_addr amount
 
 def toExecute (σ : AccountMap) (t : AccountAddress) : ToExecute :=
-  if /- t is a precompiled account -/ t ∈ π then
+  if /- t is a precompiled account -/ t ∈ precompileAddresses then
     ToExecute.Precompiled t
   else Id.run do
     -- We use the code directly without an indirection a'la `codeMap[t]`.

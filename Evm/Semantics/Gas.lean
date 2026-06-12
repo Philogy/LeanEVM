@@ -34,7 +34,7 @@ with the definition of `C_<>` functions that are described inline along with the
 
 It would be worth restructing everything to obtain cleaner separation of concerns.
 -/
-def Csstore (s : ExecutionState) : ℕ :=
+def sstoreCost (s : ExecutionState) : ℕ :=
   let { stack := μₛ, accountMap := σ, σ₀ := σ₀, executionEnv.codeOwner := Iₐ, .. } := s
   let { storage := σ_Iₐ, .. } := σ.find! Iₐ
   let storeAddr := μₛ[0]!
@@ -54,7 +54,7 @@ def Csstore (s : ExecutionState) : ℕ :=
                         /- v ≠ v' ∧ v₀ = v ∧ v₀ ≠ 0 -/     Gsreset
   loadComponent + storeComponent
 
-def Ctstore : ℕ :=
+def tstoreCost : ℕ :=
   let loadComponent := 0
   let storeComponent := Gwarmaccess
   loadComponent + storeComponent
@@ -62,19 +62,19 @@ def Ctstore : ℕ :=
 /--
 (328)
 -/
-def Caccess (a : AccountAddress) (A : Substate) : ℕ :=
+def accessCost (a : AccountAddress) (A : Substate) : ℕ :=
   if A.accessedAccounts.contains a
   then Gwarmaccess
   else Gcoldaccountaccess
 
 /--
 CHECK -
-In YP we have `Cselfdestruct(σ, μ)`; if we were to compute `Aₐ` that we need, we would need an
+In YP we have `selfdestructCost(σ, μ)`; if we were to compute `Aₐ` that we need, we would need an
 address in `σ` - is this address supposed to be obvious?
 CURRENT SOLUTION -
 We take `ExecutionState`.
 -/
-def Cselfdestruct (s : ExecutionState) : ℕ :=
+def selfdestructCost (s : ExecutionState) : ℕ :=
   let r := AccountAddress.ofUInt256 s.stack[0]!
   let { substate.accessedAccounts := Aₐ, accountMap := σ, executionEnv.codeOwner := Iₐ, .. } := s
   let c_cold := if Aₐ.contains r then 0 else Gcoldaccountaccess
@@ -87,49 +87,49 @@ def Cselfdestruct (s : ExecutionState) : ℕ :=
 /--
 NB Assumes stack coherency.
 -/
-def Csload (μₛ : Stack UInt256) (A : Substate) (I : ExecutionEnv) : ℕ :=
+def sloadCost (μₛ : Stack UInt256) (A : Substate) (I : ExecutionEnv) : ℕ :=
   if A.accessedStorageKeys.contains (I.codeOwner, μₛ[0]!)
   then Gwarmaccess
   else Gcoldsload
 
-def Ctload : ℕ :=
+def tloadCost : ℕ :=
   Gwarmaccess
 
 /--
 (331)
 -/
-def L (n : ℕ) : ℕ := n - (n / 64)
+def allButOneSixtyFourth (n : ℕ) : ℕ := n - (n / 64)
 
-def Cnew (t : AccountAddress) (val : UInt256) (σ : AccountMap) : ℕ :=
+def newAccountCost (t : AccountAddress) (val : UInt256) (σ : AccountMap) : ℕ :=
   if Evm.State.dead σ t && val != 0 then Gnewaccount else 0
 
-def Cxfer (val : UInt256) : ℕ :=
+def transferCost (val : UInt256) : ℕ :=
   if val != 0 then Gcallvalue else 0
 
-def Cextra (t r : AccountAddress) (val : UInt256) (σ : AccountMap) (A : Substate) : ℕ :=
-  Caccess t A + Cxfer val + Cnew r val σ
+def callExtraCost (t r : AccountAddress) (val : UInt256) (σ : AccountMap) (A : Substate) : ℕ :=
+  accessCost t A + transferCost val + newAccountCost r val σ
 
-def Cgascap (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) :=
-  if μ.gasAvailable.toNat >= Cextra t r val σ A then
-    min (L <| (μ.gasAvailable.toNat - Cextra t r val σ A)) g.toNat
+def callGasCap (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) :=
+  if μ.gasAvailable.toNat >= callExtraCost t r val σ A then
+    min (allButOneSixtyFourth <| (μ.gasAvailable.toNat - callExtraCost t r val σ A)) g.toNat
   else
     g.toNat
 
-def Ccallgas (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
+def callGas (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
   match val with
-    | 0 => Cgascap t r val g σ μ A
-    | _ => Cgascap t r val g σ μ A + GasConstants.Gcallstipend
+    | 0 => callGasCap t r val g σ μ A
+    | _ => callGasCap t r val g σ μ A + GasConstants.Gcallstipend
 
 /--
 NB Assumes stack coherence.
 -/
-def Ccall (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
-  Cgascap t r val g σ μ A + Cextra t r val σ A
+def callCost (t r : AccountAddress) (val g : UInt256) (σ : AccountMap) (μ : MachineState) (A : Substate) : ℕ :=
+  callGasCap t r val g σ μ A + callExtraCost t r val σ A
 
 /--
 (65)
 -/
-def R (x : ℕ) : ℕ := Ginitcodeword * ((x + 31) / 32)
+def initCodeCost (x : ℕ) : ℕ := Ginitcodeword * ((x + 31) / 32)
 
 def intrinsicGas (T : Transaction) : ℕ :=
   let g₀_data :=
@@ -143,7 +143,7 @@ def intrinsicGas (T : Transaction) : ℕ :=
       0
   let g₀_create : ℕ :=
     if T.base.recipient == none then
-      GasConstants.Gtxcreate + R (T.base.data.size)
+      GasConstants.Gtxcreate + initCodeCost (T.base.data.size)
     else 0
 
   let g₀_accessList : ℕ :=
@@ -160,35 +160,35 @@ H.1. Gas Cost - the third summand.
 NB Stack accesses are assumed guarded here and we access with `!`.
 This is for keeping in sync with the way the YP is structures, at least for the time being.
 -/
-def C' (s : ExecutionState) (instr : Operation) : ℕ :=
+def operationCost (s : ExecutionState) (instr : Operation) : ℕ :=
   let { accountMap := σ, stack := μₛ, substate := A, toMachineState := μ, executionEnv := I, ..} := s
   match instr with
-    | .SSTORE => Csstore s
-    | .TSTORE => Ctstore
+    | .SSTORE => sstoreCost s
+    | .TSTORE => tstoreCost
     | .EXP => let μ₁ := μₛ[1]!; if μ₁ == 0 then Gexp else Gexp + Gexpbyte * (1 + Nat.log 256 μ₁.toNat) -- TODO(check) I think this floors by itself. cf. H.1. YP.
-    | .EXTCODECOPY => Caccess (AccountAddress.ofUInt256 μₛ[0]!) A + Gcopy * ((μₛ[3]!.toNat + 31) / 32)
+    | .EXTCODECOPY => accessCost (AccountAddress.ofUInt256 μₛ[0]!) A + Gcopy * ((μₛ[3]!.toNat + 31) / 32)
     | .LOG0 => Glog + Glogdata * μₛ[1]!.toNat
     | .LOG1 => Glog + Glogdata * μₛ[1]!.toNat +     Glogtopic
     | .LOG2 => Glog + Glogdata * μₛ[1]!.toNat + 2 * Glogtopic
     | .LOG3 => Glog + Glogdata * μₛ[1]!.toNat + 3 * Glogtopic
     | .LOG4 => Glog + Glogdata * μₛ[1]!.toNat + 4 * Glogtopic
-    | .SELFDESTRUCT => Cselfdestruct s
-    | .CREATE => Gcreate + R μₛ[2]!.toNat
-    | .CREATE2 => let μ₂ := μₛ[2]!; Gcreate + Gkeccak256word * ((μ₂.toNat + 31) / 32) + R μ₂.toNat
+    | .SELFDESTRUCT => selfdestructCost s
+    | .CREATE => Gcreate + initCodeCost μₛ[2]!.toNat
+    | .CREATE2 => let μ₂ := μₛ[2]!; Gcreate + Gkeccak256word * ((μ₂.toNat + 31) / 32) + initCodeCost μ₂.toNat
     | .KECCAK256 => Gkeccak256 + Gkeccak256word * ((μₛ[1]!.toNat + 31) / 32)
     | .JUMPDEST => Gjumpdest
-    | .SLOAD => Csload μₛ A I
-    | .TLOAD => Ctload
+    | .SLOAD => sloadCost μₛ A I
+    | .TLOAD => tloadCost
     | .BLOCKHASH => Gblockhash
     /-
       By `μₛ[2]` the YP means the value that is to be transferred,
       not what happens to be on the stack at index 2. Therefore it is 0 for
       `DELEGATECALL` and `STATICCALL`.
     -/
-    | .CALL =>         Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!) μₛ[2]! μₛ[0]! σ μ A
-    | .CALLCODE =>     Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner μₛ[2]! μₛ[0]! σ μ A
-    | .DELEGATECALL => Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    0 μₛ[0]! σ μ A
-    | .STATICCALL =>   Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    0 μₛ[0]! σ μ A
+    | .CALL =>         callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!) μₛ[2]! μₛ[0]! σ μ A
+    | .CALLCODE =>     callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner μₛ[2]! μₛ[0]! σ μ A
+    | .DELEGATECALL => callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    0 μₛ[0]! σ μ A
+    | .STATICCALL =>   callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    0 μₛ[0]! σ μ A
     | .BLOBHASH => HASH_OPCODE_GAS
     -- Direct match arms for the Appendix G instruction groups (W_copy, W_extaccount,
     -- W_zero, W_base, W_verylow, W_low, W_mid, W_high). Previously linear `List.elem`
@@ -197,7 +197,7 @@ def C' (s : ExecutionState) (instr : Operation) : ℕ :=
     | .CALLDATACOPY | .CODECOPY | .RETURNDATACOPY | .MCOPY =>
       Gverylow + Gcopy * ((μₛ[2]!.toNat + 31) / 32)
     | .BALANCE | .EXTCODESIZE | .EXTCODEHASH =>
-      Caccess (AccountAddress.ofUInt256 μₛ[0]!) A
+      accessCost (AccountAddress.ofUInt256 μₛ[0]!) A
     | .STOP | .RETURN | .REVERT => Gzero
     | .ADDRESS | .ORIGIN | .CALLER | .CALLVALUE | .CALLDATASIZE | .CODESIZE | .GASPRICE
     | .COINBASE | .TIMESTAMP | .NUMBER | .PREVRANDAO | .GASLIMIT | .CHAINID

@@ -7,7 +7,7 @@ import Evm.Wheels
 
 namespace Evm
 
-def argOnNBytesOfInstr : Operation → ℕ
+def pushArgWidth : Operation → ℕ
   -- | .Push .PUSH0 => 0 is handled as default.
   | .Push .PUSH1 => 1
   | .Push .PUSH2 => 2
@@ -43,7 +43,7 @@ def argOnNBytesOfInstr : Operation → ℕ
   | .Push .PUSH32 => 32
   | _ => 0
 
-def N (pc : UInt256) (instr : Operation) := pc + 1 + .ofNat (argOnNBytesOfInstr instr)
+def nextInstrPos (pc : UInt256) (instr : Operation) := pc + 1 + .ofNat (pushArgWidth instr)
 
 /--
 Returns the instruction from `arr` at `pc` assuming it is valid.
@@ -53,7 +53,7 @@ The `Push` instruction also returns the argument as an EVM word along with the w
 def decode (arr : ByteArray) (pc : UInt256) :
   Option (Operation × Option (UInt256 × Nat)) := do
   let instr ← arr.get? pc.toNat >>= Evm.parseInstr
-  let argWidth := argOnNBytesOfInstr instr
+  let argWidth := pushArgWidth instr
   .some (
     instr,
     if argWidth == 0
@@ -61,12 +61,12 @@ def decode (arr : ByteArray) (pc : UInt256) :
     else .some (Evm.uInt256OfByteArray (arr.extract' pc.toNat.succ (pc.toNat.succ + argWidth)), argWidth)
   )
 
-partial def D_J_aux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
+partial def validJumpDestsAux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
   match c.get? i.toNat >>= Evm.parseInstr with
     | none => result
-    | some cᵢ => D_J_aux c (N i cᵢ) (if cᵢ = .JUMPDEST then result.push i else result)
+    | some cᵢ => validJumpDestsAux c (nextInstrPos i cᵢ) (if cᵢ = .JUMPDEST then result.push i else result)
 
-def D_J (c : ByteArray) (i : UInt256) : Array UInt256 :=
-  D_J_aux c i #[]
+def validJumpDests (c : ByteArray) (i : UInt256) : Array UInt256 :=
+  validJumpDestsAux c i #[]
 
 end Evm

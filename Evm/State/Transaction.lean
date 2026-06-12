@@ -157,7 +157,7 @@ structure TransactionReceipt where
   logSeries                : LogSeries /- Rlp.encodeList -/
 deriving BEq, Inhabited, Repr
 
-def L_R : TransactionReceipt → Rlp
+def TransactionReceipt.toRlp : TransactionReceipt → Rlp
   | ⟨_, statusCode, cumulativeGasUsedInBlock, bloomFilter, logSeries⟩ =>
   .list
     [ if statusCode then .bytes (BE 1) else .bytes (BE 0)
@@ -178,7 +178,7 @@ def TransactionReceipt.computeTrieRoot (ws : Array ByteArray) : Option ByteArray
     | some ws => (ByteArray.ofBlob (blobComputeTrieRoot ws)).toOption
 
 def TransactionReceipt.toTrieValue (r : TransactionReceipt) : ByteArray :=
-  let rlp := Option.get! ∘ Rlp.encode ∘ L_R <| r
+  let rlp := Option.get! ∘ Rlp.encode ∘ TransactionReceipt.toRlp <| r
   if r.type = 0 then rlp else ⟨#[r.type]⟩ ++ rlp
 
 end Evm

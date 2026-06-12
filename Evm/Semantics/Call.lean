@@ -59,16 +59,16 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
     | ToExecute.Precompiled p =>
       let (z, σ'', g', A'', out) :=
         match p with
-          | 1  => Ξ_ECREC    σ₁ params.gas params.substate I
-          | 2  => Ξ_SHA256   σ₁ params.gas params.substate I
-          | 3  => Ξ_RIP160   σ₁ params.gas params.substate I
-          | 4  => Ξ_ID       σ₁ params.gas params.substate I
-          | 5  => Ξ_EXPMOD   σ₁ params.gas params.substate I
-          | 6  => Ξ_BN_ADD   σ₁ params.gas params.substate I
-          | 7  => Ξ_BN_MUL   σ₁ params.gas params.substate I
-          | 8  => Ξ_SNARKV   σ₁ params.gas params.substate I
-          | 9  => Ξ_BLAKE2_F σ₁ params.gas params.substate I
-          | 10 => Ξ_PointEval σ₁ params.gas params.substate I
+          | 1  => Precompiles.ecRecover        σ₁ params.gas params.substate I
+          | 2  => Precompiles.sha256           σ₁ params.gas params.substate I
+          | 3  => Precompiles.ripemd160        σ₁ params.gas params.substate I
+          | 4  => Precompiles.identity         σ₁ params.gas params.substate I
+          | 5  => Precompiles.modExp           σ₁ params.gas params.substate I
+          | 6  => Precompiles.ecAdd            σ₁ params.gas params.substate I
+          | 7  => Precompiles.ecMul            σ₁ params.gas params.substate I
+          | 8  => Precompiles.ecPairing        σ₁ params.gas params.substate I
+          | 9  => Precompiles.blake2f          σ₁ params.gas params.substate I
+          | 10 => Precompiles.pointEvaluation  σ₁ params.gas params.substate I
           | _  => (false, ∅, 0, params.substate, .empty) -- unreachable: `toExecute` yields 1–10 only
       .inr
         -- NB the precompile path historically clears `createdAccounts`; kept verbatim.
@@ -82,7 +82,7 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
     | ToExecute.Code _ =>
       .inl
         { kind := .call ⟨params.createdAccounts, σ, params.substate⟩
-          validJumps := D_J I.code 0
+          validJumps := validJumpDests I.code 0
           exec :=
             { (default : ExecutionState) with
                 accountMap := σ₁

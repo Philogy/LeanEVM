@@ -12,7 +12,7 @@ namespace Evm
 The state-modifying instructions `W` (eq. 159) — forbidden when the frame
 lacks `perm` (static call context).
 -/
-private def W (w : Operation) (s : Stack UInt256) : Bool :=
+private def mutatesState (w : Operation) (s : Stack UInt256) : Bool :=
   match w with
     | .CREATE | .CREATE2 | .SSTORE | .SELFDESTRUCT
     | .LOG0 | .LOG1 | .LOG2 | .LOG3 | .LOG4 | .TSTORE => true
@@ -32,20 +32,20 @@ instruction against the current state, charges the memory-expansion cost, and
 returns the updated state together with the instruction's remaining gas cost
 (charged by the instruction itself).
 -/
-private def Z (validJumps : Array UInt256) (w : Operation) (evmState : ExecutionState) :
+private def checkExceptionalHalt (validJumps : Array UInt256) (w : Operation) (evmState : ExecutionState) :
     Except ExecutionException (ExecutionState × ℕ) := do
   -- The stack-depth check precedes the cost computations: both
-  -- memoryExpansionCost and C' peek at stack slots with `!`.
-  if δ w = none then
+  -- memoryExpansionCost and operationCost peek at stack slots with `!`.
+  if stackPopCount w = none then
     .error .InvalidInstruction
-  if evmState.stackSize < (δ w).getD 0 then
+  if evmState.stackSize < (stackPopCount w).getD 0 then
     .error .StackUnderflow
   let cost₁ := memoryExpansionCost evmState w
   if evmState.gasAvailable.toNat < cost₁ then
     .error .OutOfGass
   let gasAvailable := evmState.gasAvailable - .ofNat cost₁
   let evmState := { evmState with gasAvailable := gasAvailable }
-  let cost₂ := C' evmState w
+  let cost₂ := operationCost evmState w
 
   if evmState.gasAvailable.toNat < cost₂ then
     .error .OutOfGass
@@ -61,10 +61,10 @@ private def Z (validJumps : Array UInt256) (w : Operation) (evmState : Execution
   if w = .RETURNDATACOPY ∧ (evmState.stack.getD 1 0).toNat + (evmState.stack.getD 2 0).toNat > evmState.returnData.size then
     .error .InvalidMemoryAccess
 
-  if evmState.stackSize - (δ w).getD 0 + (α w).getD 0 > 1024 then
+  if evmState.stackSize - (stackPopCount w).getD 0 + (stackPushCount w).getD 0 > 1024 then
     .error .StackOverflow
 
-  if (¬ evmState.executionEnv.perm) ∧ W w evmState.stack then
+  if (¬ evmState.executionEnv.perm) ∧ mutatesState w evmState.stack then
     .error .StaticModeViolation
 
   if (w = .SSTORE) ∧ evmState.gasAvailable.toNat ≤ GasConstants.Gcallstipend then
@@ -78,7 +78,7 @@ private def Z (validJumps : Array UInt256) (w : Operation) (evmState : Execution
   pure (evmState, cost₂)
 
 /-- The normal-halt discriminator `H` (eq. 146-ish). -/
-private def H (μ : MachineState) (w : Operation) : Option ByteArray :=
+private def normalHaltOutput (μ : MachineState) (w : Operation) : Option ByteArray :=
   match w with
     | .RETURN | .REVERT => some μ.H_return
     | .STOP | .SELFDESTRUCT => some .empty
@@ -101,7 +101,7 @@ private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
   let Iₐ := evmState.executionEnv.codeOwner
   let σ := evmState.accountMap
   let Iₑ := evmState.executionEnv.depth
-  let callgas := Ccallgas t recipient value gas σ evmState.toMachineState evmState.substate
+  let callgas := callGas t recipient value gas σ evmState.toMachineState evmState.substate
   let evmState := { evmState with gasAvailable := evmState.gasAvailable - UInt256.ofNat gasCost }
   -- m[μs[3] . . . (μs[3] + μs[4] − 1)]
   let i := evmState.memory.readWithPadding inOffset.toNat inSize.toNat
@@ -174,12 +174,12 @@ private def prepareCreate (fr : Frame) (evmState : ExecutionState)
       initSize := initSize
       initCodeSize := i.size }
   -- The creation cannot start: the instruction still completes (pushing 0),
-  -- with the creator's reserved gas `L(g)` returned untouched.
+  -- with the creator's reserved gas `allButOneSixtyFourth(g)` returned untouched.
   let failed : CreateResult :=
     { address := default
       createdAccounts := evmState.createdAccounts
       accounts := σ
-      gasRemaining := .ofNat (L evmState.gasAvailable.toNat)
+      gasRemaining := .ofNat (allButOneSixtyFourth evmState.gasAvailable.toNat)
       substate := evmState.toState.substate
       success := false
       output := .empty }
@@ -196,7 +196,7 @@ private def prepareCreate (fr : Frame) (evmState : ExecutionState)
         substate := evmState.toState.substate
         caller := Iₐ
         origin := I.sender
-        gas := .ofNat <| L evmState.gasAvailable.toNat
+        gas := .ofNat <| allButOneSixtyFourth evmState.gasAvailable.toNat
         gasPrice := .ofNat I.gasPrice
         value := value
         initCode := i
@@ -280,18 +280,18 @@ the result via the normal-halt discriminator `H`.
 def stepFrame (fr : Frame) : StepOutcome :=
   let evmState := fr.exec
   let (w, arg) := decode evmState.executionEnv.code evmState.pc |>.getD (.STOP, .none)
-  match Z fr.validJumps w evmState with
+  match checkExceptionalHalt fr.validJumps w evmState with
     | .error e => .halt (.exception e)
     | .ok (evmState, cost₂) =>
-      -- Every instruction's net stack effect is exactly `α − δ` (the
+      -- Every instruction's net stack effect is exactly `α − δ` (stackPushCount − stackPopCount) (the
       -- StackOverflow check above is predicated on this), so the cached
       -- stack size can be maintained without walking the stack.
-      let stackSize' := evmState.stackSize - (δ w).getD 0 + (α w).getD 0
+      let stackSize' := evmState.stackSize - (stackPopCount w).getD 0 + (stackPushCount w).getD 0
       match execInstr { fr with exec := evmState } w arg cost₂ with
         | .error e => .halt (.exception e)
         | .ok (.next exec') =>
           let exec' := { exec' with stackSize := stackSize' }
-          match H exec'.toMachineState w with
+          match normalHaltOutput exec'.toMachineState w with
             | none => .next exec'
             | some o =>
               if w == .REVERT then
@@ -306,7 +306,7 @@ def stepFrame (fr : Frame) : StepOutcome :=
                 .halt (.success exec' o)
         | .ok (.needsCall params pending) =>
           -- The suspended frame resumes with the popped stack plus the pushed
-          -- success flag — its length is the predicted `α − δ` net effect.
+          -- success flag — its length is the predicted `α − δ` (stackPushCount − stackPopCount) net effect.
           .needsCall params
             { pending with frame.exec.stackSize := stackSize' }
         | .ok (.needsCreate params pending) =>

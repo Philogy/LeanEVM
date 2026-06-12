@@ -107,7 +107,7 @@ private def almostBEqButNotQuite (s₁ s₂ : PersistentAccountMap) : Except Str
 
 end
 
-def executeTransaction
+def applyTransaction
   (transaction : Transaction)
   (sender : AccountAddress)
   (s : ExecutionState)
@@ -115,7 +115,7 @@ def executeTransaction
   : Except Evm.Exception ExecutionState
 := do
   let { accounts := ypState, substate, success := statusCode, gasUsed := totalGasUsed } ←
-    Υ
+    executeTransaction
       s.accountMap
       header.baseFeePerGas
       header
@@ -241,7 +241,7 @@ def validateTransaction
         throw <| .TransactionException .INITCODE_SIZE_EXCEEDED
     | some _ => pure ()
 
-  let some T_RLP := Rlp.encode (← (L_X T)) | throw <| .TransactionException .IllFormedRLP
+  let some T_RLP := Rlp.encode (← (txSigningData T)) | throw <| .TransactionException .IllFormedRLP
 
   let r : ℕ := fromByteArrayBigEndian T.base.r
   let s : ℕ := fromByteArrayBigEndian T.base.s
@@ -307,7 +307,7 @@ def validateTransaction
   pure S_T
 
  where
-  L_X (T : Transaction) : Except Evm.Exception Rlp := -- (317)
+  txSigningData (T : Transaction) : Except Evm.Exception Rlp := -- (317)
     let accessEntryRLP : AccountAddress × Array UInt256 → Rlp
       | ⟨a, s⟩ => .list [.bytes a.toByteArray, .list (s.map (.bytes ∘ UInt256.toByteArray)).toList]
     let accessEntriesRLP (aEs : List (AccountAddress × Array UInt256)) : Rlp :=
@@ -569,7 +569,7 @@ def processBlocks
               s'.totalGasUsedInBlock
               tx
               (senderHint := (block.senders.getD i none))
-          executeTransaction tx S_T s' block.blockHeader
+          applyTransaction tx S_T s' block.blockHeader
         )
         {s with totalGasUsedInBlock := 0, transactionReceipts := .empty}
 

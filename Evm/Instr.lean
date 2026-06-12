@@ -190,7 +190,7 @@ def serializeInstr : Operation → UInt8
   | .Log l          => serializeLogInstr l
   | .System s       => serializeSysInstr s
 
-def δ : Operation → Option ℕ
+def stackPopCount : Operation → Option ℕ
   | .STOP           => some 0
   | .ADD            => some 2
   | .MUL            => some 2
@@ -309,7 +309,7 @@ def δ : Operation → Option ℕ
   | .INVALID        => none
   | .SELFDESTRUCT   => some 1
 
-def α : Operation → Option ℕ
+def stackPushCount : Operation → Option ℕ
   | .STOP => some 0
   | .ADD => some 1
   | .MUL => some 1
