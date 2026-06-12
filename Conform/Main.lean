@@ -58,11 +58,23 @@ def testFiles (root               : System.FilePath)
   -- One task per fixture file; each file is parsed exactly once, inside its
   -- task. The runtime's task pool load-balances the files across workers
   -- (pool size = LEAN_NUM_THREADS, defaulting to the hardware core count).
+  -- Each task reports completion through a shared counter, so progress
+  -- (`[k/M files, n tests, f failed]`) and failures stream live.
+  let progress ← IO.mkRef ((0, 0, 0) : ℕ × ℕ × ℕ)
+  let numFiles := testFiles.size
   let mut tasks : Array (Task _) := .empty
-  IO.println s!"Scheduling {testFiles.size} test files for parallel execution..."
+  IO.println s!"Scheduling {numFiles} test files for parallel execution..."
   for path in testFiles do
-    tasks := tasks.push
-      (←IO.asTask <| Evm.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none))
+    tasks := tasks.push <| ←IO.asTask do
+      let r ← Evm.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none)
+      let batchFails := r.2.filter (·.2.isSome)
+      for ((file, test), _) in batchFails do
+        IO.println s!"FAIL {file.fileName.getD file.toString}[{test}]"
+      let (fs, ts, fl) ← progress.modifyGet λ (fs, ts, fl) ↦
+        let v := (fs + 1, ts + r.2.size, fl + batchFails.size)
+        (v, v)
+      IO.println s!"[{fs}/{numFiles} files, {ts} tests, {fl} failed]"
+      pure r
 
   let mut failedTests : Array String := .empty
 
