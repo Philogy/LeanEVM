@@ -251,16 +251,26 @@ def C' (s : State) (instr : Operation .EVM) : ℕ :=
     | .DELEGATECALL => Ccall (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    ⟨0⟩ μₛ[0]! σ μ A
     | .STATICCALL =>   Ccall (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    ⟨0⟩ μₛ[0]! σ μ A
     | .BLOBHASH => HASH_OPCODE_GAS
-    | w =>
-      if w ∈ Wcopy then Gverylow + Gcopy * ((μₛ[2]!.toNat + 31) / 32) else
-      if w ∈ Wextaccount then Caccess (AccountAddress.ofUInt256 μₛ[0]!) A else
-      if w ∈ Wzero then Gzero else
-      if w ∈ Wbase then Gbase else
-      if w ∈ Wverylow then Gverylow else
-      if w ∈ Wlow then Glow else
-      if w ∈ Wmid then Gmid else
-      if w ∈ Whigh then Ghigh else
-      0
+    -- Direct match arms for the Appendix G instruction groups (W_copy, W_extaccount,
+    -- W_zero, W_base, W_verylow, W_low, W_mid, W_high). Previously linear `List.elem`
+    -- scans over the `InstructionGasGroups` lists per executed instruction — the single
+    -- hottest spot in the interpreter profile.
+    | .CALLDATACOPY | .CODECOPY | .RETURNDATACOPY | .MCOPY =>
+      Gverylow + Gcopy * ((μₛ[2]!.toNat + 31) / 32)
+    | .BALANCE | .EXTCODESIZE | .EXTCODEHASH =>
+      Caccess (AccountAddress.ofUInt256 μₛ[0]!) A
+    | .STOP | .RETURN | .REVERT => Gzero
+    | .ADDRESS | .ORIGIN | .CALLER | .CALLVALUE | .CALLDATASIZE | .CODESIZE | .GASPRICE
+    | .COINBASE | .TIMESTAMP | .NUMBER | .PREVRANDAO | .GASLIMIT | .CHAINID
+    | .RETURNDATASIZE | .POP | .PC | .MSIZE | .GAS | .BASEFEE | .BLOBBASEFEE
+    | .Push .PUSH0 => Gbase
+    | .ADD | .SUB | .NOT | .LT | .GT | .SLT | .SGT | .EQ | .ISZERO | .AND | .OR | .XOR
+    | .BYTE | .SHL | .SHR | .SAR | .CALLDATALOAD | .MLOAD | .MSTORE | .MSTORE8
+    | .Push _ | .Dup _ | .Exchange _ => Gverylow
+    | .MUL | .DIV | .SDIV | .MOD | .SMOD | .SIGNEXTEND | .SELFBALANCE => Glow
+    | .ADDMOD | .MULMOD | .JUMP => Gmid
+    | .JUMPI => Ghigh
+    | _ => 0
 
 /--
 H.1. Gas Cost
