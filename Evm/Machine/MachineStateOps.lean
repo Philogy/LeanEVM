@@ -91,7 +91,7 @@ def returndatacopy (self : MachineState) (mstart rstart size : UInt256) : Machin
 
 def evmReturn (self : MachineState) (mstart s : UInt256) : MachineState :=
   { self with
-    H_return := self.memory.readWithPadding mstart.toNat s.toNat
+    output := self.memory.readWithPadding mstart.toNat s.toNat
     activeWords :=
       .ofNat <| MachineState.M self.activeWords.toNat mstart.toNat s.toNat
   }

@@ -35,7 +35,7 @@ with the definition of `C_<>` functions that are described inline along with the
 It would be worth restructing everything to obtain cleaner separation of concerns.
 -/
 def sstoreCost (s : ExecutionState) : ℕ :=
-  let { stack := μₛ, accountMap := σ, σ₀ := σ₀, executionEnv.codeOwner := Iₐ, .. } := s
+  let { stack := μₛ, accounts := σ, originalAccounts := σ₀, executionEnv.address := Iₐ, .. } := s
   let { storage := σ_Iₐ, .. } := σ.find! Iₐ
   let storeAddr := μₛ[0]!
   let v₀ :=
@@ -76,7 +76,7 @@ We take `ExecutionState`.
 -/
 def selfdestructCost (s : ExecutionState) : ℕ :=
   let r := AccountAddress.ofUInt256 s.stack[0]!
-  let { substate.accessedAccounts := Aₐ, accountMap := σ, executionEnv.codeOwner := Iₐ, .. } := s
+  let { substate.accessedAccounts := Aₐ, accounts := σ, executionEnv.address := Iₐ, .. } := s
   let c_cold := if Aₐ.contains r then 0 else Gcoldaccountaccess
   let c_new :=
     if Evm.State.dead σ r ∧ (σ.find? Iₐ |>.option 0 (·.balance)) ≠ 0 then
@@ -88,7 +88,7 @@ def selfdestructCost (s : ExecutionState) : ℕ :=
 NB Assumes stack coherency.
 -/
 def sloadCost (μₛ : Stack UInt256) (A : Substate) (I : ExecutionEnv) : ℕ :=
-  if A.accessedStorageKeys.contains (I.codeOwner, μₛ[0]!)
+  if A.accessedStorageKeys.contains (I.address, μₛ[0]!)
   then Gwarmaccess
   else Gcoldsload
 
@@ -161,7 +161,7 @@ NB Stack accesses are assumed guarded here and we access with `!`.
 This is for keeping in sync with the way the YP is structures, at least for the time being.
 -/
 def operationCost (s : ExecutionState) (instr : Operation) : ℕ :=
-  let { accountMap := σ, stack := μₛ, substate := A, toMachineState := μ, executionEnv := I, ..} := s
+  let { accounts := σ, stack := μₛ, substate := A, toMachineState := μ, executionEnv := I, ..} := s
   match instr with
     | .SSTORE => sstoreCost s
     | .TSTORE => tstoreCost
@@ -186,8 +186,8 @@ def operationCost (s : ExecutionState) (instr : Operation) : ℕ :=
       `DELEGATECALL` and `STATICCALL`.
     -/
     | .CALL =>         callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!) μₛ[2]! μₛ[0]! σ μ A
-    | .CALLCODE =>     callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner μₛ[2]! μₛ[0]! σ μ A
-    | .DELEGATECALL => callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.codeOwner    0 μₛ[0]! σ μ A
+    | .CALLCODE =>     callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.address μₛ[2]! μₛ[0]! σ μ A
+    | .DELEGATECALL => callCost (AccountAddress.ofUInt256 μₛ[1]!)          s.executionEnv.address    0 μₛ[0]! σ μ A
     | .STATICCALL =>   callCost (AccountAddress.ofUInt256 μₛ[1]!) (AccountAddress.ofUInt256 μₛ[1]!)    0 μₛ[0]! σ μ A
     | .BLOBHASH => HASH_OPCODE_GAS
     -- Direct match arms for the Appendix G instruction groups (W_copy, W_extaccount,

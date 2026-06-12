@@ -23,16 +23,16 @@ DEAD(σ, a). Section 4.1., equation 15.
 def dead (σ : AccountMap) (addr : AccountAddress) : Bool :=
   σ.find? addr |>.option True Account.emptyAccount
 
-def accountExists (self : State) (addr : AccountAddress) : Bool := self.accountMap.find? addr |>.isSome
+def accountExists (self : State) (addr : AccountAddress) : Bool := self.accounts.find? addr |>.isSome
 
 def lookupAccount (self : State) (addr : AccountAddress) : Option (Account) :=
-  self.accountMap.find? addr
+  self.accounts.find? addr
 
 def updateAccount (addr : AccountAddress) (act : Account) (self : State) : State :=
-  { self with accountMap := self.accountMap.insert addr act }
+  { self with accounts := self.accounts.insert addr act }
 
 def setAccount (self : State) (addr : AccountAddress) (acc : Account) : State :=
-  { self with accountMap := self.accountMap.insert addr acc }
+  { self with accounts := self.accounts.insert addr acc }
 
 def updateAccount! (self : State) (addr : AccountAddress) (f : Account → Account) : State :=
   let acc! := self.lookupAccount addr |>.getD default
@@ -40,7 +40,7 @@ def updateAccount! (self : State) (addr : AccountAddress) (f : Account → Accou
 
 def balance (self : State) (k : UInt256) : State × UInt256 :=
   let addr := AccountAddress.ofUInt256 k
-  (self.addAccessedAccount addr, self.accountMap.find? addr |>.elim 0 (·.balance))
+  (self.addAccessedAccount addr, self.accounts.find? addr |>.elim 0 (·.balance))
 
 def initialiseAccount (addr : AccountAddress) (self : State) : State :=
   if self.accountExists addr then self else self.updateAccount addr default
@@ -61,7 +61,7 @@ def extCodeSize (self : State) (a : UInt256) : State × UInt256 :=
 def extCodeHash (self : State) (v : UInt256) : State × UInt256 :=
   let addr := AccountAddress.ofUInt256 v
   let newState := self.addAccessedAccount addr
-  if dead self.accountMap addr then (newState, 0) else
+  if dead self.accounts addr then (newState, 0) else
   let r := self.lookupAccount (AccountAddress.ofUInt256 v) |>.option 0 Account.codeHash
   (newState, r)
 
@@ -70,31 +70,31 @@ end CodeCopy
 section Blocks
 
 def blockHash (self : State) (blockNumber : UInt256) : UInt256 :=
-  let v := self.executionEnv.header.number
+  let v := self.executionEnv.blockHeader.number
   if v ≤ blockNumber.toNat || blockNumber.toNat + 256 < v then 0
   else
     let hashes := self.blockHashes
     hashes.getD blockNumber.toNat 0
 
 def coinBase (self : State) : AccountAddress :=
-  self.executionEnv.header.beneficiary
+  self.executionEnv.blockHeader.beneficiary
 
 def timeStamp (self : State) : UInt256 :=
-  .ofNat self.executionEnv.header.timestamp
+  .ofNat self.executionEnv.blockHeader.timestamp
 
 def number (self : State) : UInt256 :=
-  .ofNat self.executionEnv.header.number
+  .ofNat self.executionEnv.blockHeader.number
 
 def difficulty (self : State) : UInt256 :=
-  .ofNat self.executionEnv.header.difficulty
+  .ofNat self.executionEnv.blockHeader.difficulty
 
 def gasLimit (self : State) : UInt256 :=
-  .ofNat self.executionEnv.header.gasLimit
+  .ofNat self.executionEnv.blockHeader.gasLimit
 
 def chainId (_ : State) : UInt256 := .ofNat Evm.chainId
 
 def selfbalance (self : State) : UInt256 :=
-  Batteries.RBMap.find? self.accountMap self.executionEnv.codeOwner |>.elim 0 (·.balance)
+  Batteries.RBMap.find? self.accounts self.executionEnv.address |>.elim 0 (·.balance)
 
 end Blocks
 
@@ -104,16 +104,16 @@ def setStorage! (self : State) (addr : AccountAddress) (strg : Storage) : State 
   self.updateAccount! addr (λ acc ↦ { acc with storage := strg })
 
 def sload (self : State) (spos : UInt256) : State × UInt256 :=
-  let Iₐ := self.executionEnv.codeOwner
+  let Iₐ := self.executionEnv.address
   let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupStorage (k := spos))
   let state' := self.addAccessedStorageKey (Iₐ, spos)
   (state', v)
 
 def sstore (self : State) (spos sval : UInt256) : State :=
-  let Iₐ := self.executionEnv.codeOwner
-  let { storage := σ_Iₐ, .. } := self.accountMap.find! Iₐ
+  let Iₐ := self.executionEnv.address
+  let { storage := σ_Iₐ, .. } := self.accounts.find! Iₐ
   let v₀ :=
-    match self.σ₀.find? Iₐ with
+    match self.originalAccounts.find? Iₐ with
       | none => 0
       | some acc => acc.storage.findD spos 0
   let v := σ_Iₐ.findD spos 0
@@ -145,12 +145,12 @@ def sstore (self : State) (spos sval : UInt256) : State :=
     { self' with substate.refundBalance := newAᵣ }
 
 def tload (self : State) (spos : UInt256) : State × UInt256 :=
-  let Iₐ := self.executionEnv.codeOwner
+  let Iₐ := self.executionEnv.address
   let v := self.lookupAccount Iₐ |>.option 0 (Account.lookupTransientStorage (k := spos))
   (self, v)
 
 def tstore (self : State) (spos sval : UInt256) : State :=
-  let Iₐ := self.executionEnv.codeOwner
+  let Iₐ := self.executionEnv.address
   self.lookupAccount Iₐ |>.option self λ acc ↦
     self.updateAccount Iₐ (acc.updateTransientStorage spos sval)
 

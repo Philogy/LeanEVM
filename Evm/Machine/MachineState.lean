@@ -19,13 +19,14 @@ The partial shared `MachineState` `μ`. Section 9.4.1.
 - `memory`       `m`
 - `activeWords`  `i` - # active words.
 - `returnData`   `o` - Data from the previous call from the current environment.
+- `output`       - Data this frame halts with (RETURN/REVERT payload).
 -/
 structure MachineState where
   gasAvailable        : UInt256
   activeWords         : UInt256
   memory              : ByteArray
   returnData          : ByteArray
-  H_return            : ByteArray
+  output              : ByteArray
   deriving Inhabited
 
 -- inductive WordSize := | Standard | Single

@@ -18,14 +18,14 @@ namespace Evm
 /--
 The `State`. Section 9.3.
 
-- `accountMap`   `σ`
+- `accounts`     `σ`
 - `substate`     `A`
 - `executionEnv` `I`
 - `totalGasUsedInBlock` `Υᵍ`
 -/
 structure State where
-  accountMap          : AccountMap
-  σ₀                  : AccountMap
+  accounts            : AccountMap
+  originalAccounts    : AccountMap
   totalGasUsedInBlock : ℕ
   transactionReceipts  : Array TransactionReceipt
   substate            : Substate

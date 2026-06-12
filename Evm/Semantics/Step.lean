@@ -64,7 +64,7 @@ private def checkExceptionalHalt (validJumps : Array UInt256) (w : Operation) (e
   if evmState.stackSize - (stackPopCount w).getD 0 + (stackPushCount w).getD 0 > 1024 then
     .error .StackOverflow
 
-  if (¬ evmState.executionEnv.perm) ∧ mutatesState w evmState.stack then
+  if (¬ evmState.executionEnv.canModifyState) ∧ mutatesState w evmState.stack then
     .error .StaticModeViolation
 
   if (w = .SSTORE) ∧ evmState.gasAvailable.toNat ≤ GasConstants.Gcallstipend then
@@ -80,7 +80,7 @@ private def checkExceptionalHalt (validJumps : Array UInt256) (w : Operation) (e
 /-- The normal-halt discriminator `H` (eq. 146-ish). -/
 private def normalHaltOutput (μ : MachineState) (w : Operation) : Option ByteArray :=
   match w with
-    | .RETURN | .REVERT => some μ.H_return
+    | .RETURN | .REVERT => some μ.output
     | .STOP | .SELFDESTRUCT => some .empty
     | _ => none
 
@@ -98,8 +98,8 @@ private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
   let t : AccountAddress := AccountAddress.ofUInt256 t
   let recipient : AccountAddress := AccountAddress.ofUInt256 recipient
   let source : AccountAddress := AccountAddress.ofUInt256 source
-  let Iₐ := evmState.executionEnv.codeOwner
-  let σ := evmState.accountMap
+  let Iₐ := evmState.executionEnv.address
+  let σ := evmState.accounts
   let Iₑ := evmState.executionEnv.depth
   let callgas := callGas t recipient value gas σ evmState.toMachineState evmState.substate
   let evmState := { evmState with gasAvailable := evmState.gasAvailable - UInt256.ofNat gasCost }
@@ -122,10 +122,10 @@ private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
         genesisBlockHeader := evmState.genesisBlockHeader
         blocks := evmState.blocks
         accounts := σ                                       -- σ in  Θ(σ, ..)
-        originalAccounts := evmState.σ₀
+        originalAccounts := evmState.originalAccounts
         substate := A'                                      -- A* in Θ(.., A*, ..)
         caller := source
-        origin := evmState.executionEnv.sender              -- Iₒ in Θ(.., Iₒ, ..)
+        origin := evmState.executionEnv.origin              -- Iₒ in Θ(.., Iₒ, ..)
         recipient := recipient                              -- t in Θ(.., t, ..)
         codeSource := toExecute σ t
         gas := .ofNat callgas
@@ -134,7 +134,7 @@ private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
         apparentValue := value'
         calldata := i
         depth := Iₑ + 1
-        blockHeader := evmState.executionEnv.header
+        blockHeader := evmState.executionEnv.blockHeader
         canModifyState := permission }                      -- I_w in Θ(.., I_W)
       pending
   else
@@ -160,9 +160,9 @@ private def prepareCreate (fr : Frame) (evmState : ExecutionState)
     (ζ : Option ByteArray) : Except ExecutionException StepOutcome := do
   let i := evmState.memory.readWithPadding initOffset.toNat initSize.toNat
   let I := evmState.executionEnv
-  let Iₐ := I.codeOwner
+  let Iₐ := I.address
   let Iₑ := I.depth
-  let σ := evmState.accountMap
+  let σ := evmState.accounts
   let σ_Iₐ : Account := σ.find? Iₐ |>.getD default
   let σStar := σ.insert Iₐ { σ_Iₐ with nonce := σ_Iₐ.nonce + 1 }
   let pending : PendingCreate :=
@@ -192,18 +192,18 @@ private def prepareCreate (fr : Frame) (evmState : ExecutionState)
         genesisBlockHeader := evmState.genesisBlockHeader
         blocks := evmState.blocks
         accounts := σStar
-        originalAccounts := evmState.σ₀
+        originalAccounts := evmState.originalAccounts
         substate := evmState.toState.substate
         caller := Iₐ
-        origin := I.sender
+        origin := I.origin
         gas := .ofNat <| allButOneSixtyFourth evmState.gasAvailable.toNat
         gasPrice := .ofNat I.gasPrice
         value := value
         initCode := i
         depth := Iₑ + 1
         salt := ζ
-        blockHeader := I.header
-        canModifyState := I.perm }
+        blockHeader := I.blockHeader
+        canModifyState := I.canModifyState }
       pending
   return .next (← resumeAfterCreate failed pending).exec
 
@@ -243,27 +243,27 @@ private def execInstr (fr : Frame) (instr : Operation) (arg : Option (UInt256 ×
       -- μ₀ - gas, μ₁ - to, μ₂ - value, μ₃ - inOffset, μ₄ - inSize, μ₅ - outOffset, μ₆ - outSize
       let (stack, μ₀, μ₁, μ₂, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop7
       return prepareCall fr evmState gasCost stack
-        μ₀ (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
-        evmState.executionEnv.perm
+        μ₀ (.ofNat evmState.executionEnv.address) μ₁ μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
+        evmState.executionEnv.canModifyState
     | .CALLCODE => do
       let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₂, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop7
       return prepareCall fr evmState gasCost stack
-        μ₀ (.ofNat evmState.executionEnv.codeOwner) (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
-        evmState.executionEnv.perm
+        μ₀ (.ofNat evmState.executionEnv.address) (.ofNat evmState.executionEnv.address) μ₁ μ₂ μ₂ μ₃ μ₄ μ₅ μ₆
+        evmState.executionEnv.canModifyState
     | .DELEGATECALL => do
       -- No `value` argument: the parent's value and caller are inherited.
       let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop6
       return prepareCall fr evmState gasCost stack
-        μ₀ (.ofNat evmState.executionEnv.source) (.ofNat evmState.executionEnv.codeOwner) μ₁ 0 evmState.executionEnv.weiValue μ₃ μ₄ μ₅ μ₆
-        evmState.executionEnv.perm
+        μ₀ (.ofNat evmState.executionEnv.caller) (.ofNat evmState.executionEnv.address) μ₁ 0 evmState.executionEnv.value μ₃ μ₄ μ₅ μ₆
+        evmState.executionEnv.canModifyState
     | .STATICCALL => do
       -- No `value` argument; the child runs with state modification forbidden.
       let evmState := { fr.exec with execLength := fr.exec.execLength + 1 }
       let (stack, μ₀, μ₁, μ₃, μ₄, μ₅, μ₆) ← evmState.stack.pop6
       return prepareCall fr evmState gasCost stack
-        μ₀ (.ofNat evmState.executionEnv.codeOwner) μ₁ μ₁ 0 0 μ₃ μ₄ μ₅ μ₆
+        μ₀ (.ofNat evmState.executionEnv.address) μ₁ μ₁ 0 0 μ₃ μ₄ μ₅ μ₆
         false
     | instr =>
       let exec' ← stepPrimop instr arg

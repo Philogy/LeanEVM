@@ -76,16 +76,16 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
           |>.insert a newAccount -- (99)
   -- I
   let exEnv : ExecutionEnv :=
-    { codeOwner := a
-    , sender    := params.origin
-    , source    := s
-    , weiValue  := params.value
+    { address := a
+    , origin    := params.origin
+    , caller    := s
+    , value  := params.value
     , calldata  := default
     , code      := i
     , gasPrice  := params.gasPrice.toNat
-    , header    := params.blockHeader
+    , blockHeader := params.blockHeader
     , depth     := params.depth
-    , perm      := params.canModifyState
+    , canModifyState      := params.canModifyState
     , blobVersionedHashes := params.blobVersionedHashes
     }
   .ok
@@ -93,8 +93,8 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
       validJumps := validJumpDests i 0
       exec :=
         { (default : ExecutionState) with
-            accountMap := σStar
-            σ₀ := params.originalAccounts
+            accounts := σStar
+            originalAccounts := params.originalAccounts
             executionEnv := exEnv
             substate := AStar
             createdAccounts := createdAccounts
@@ -126,8 +126,8 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
 
     let σ' : AccountMap := -- (115)
       if F then checkpoint.accounts else
-        let newAccount' := exec.accountMap.findD address default
-        exec.accountMap.insert address { newAccount' with code := returnedData }
+        let newAccount' := exec.accounts.findD address default
+        exec.accounts.insert address { newAccount' with code := returnedData }
 
     { address := address
       createdAccounts := exec.createdAccounts
@@ -165,7 +165,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
   let g' := result.gasRemaining
   let z := result.success
   let x : UInt256 :=
-    let balance := pd.callerAccounts.find? evmState.executionEnv.codeOwner |>.option 0 (·.balance)
+    let balance := pd.callerAccounts.find? evmState.executionEnv.address |>.option 0 (·.balance)
     if z = false ∨ evmState.executionEnv.depth = 1024 ∨ pd.value > balance ∨ pd.initCodeSize > 49152
     then 0 else .ofNat result.address
   let newReturnData : ByteArray := if z then .empty else result.output
@@ -173,7 +173,7 @@ def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
     throw .OutOfGass
   let exec' :=
     { evmState with
-        accountMap := result.accounts
+        accounts := result.accounts
         substate := result.substate
         createdAccounts := result.createdAccounts
         activeWords := .ofNat <| MachineState.M evmState.activeWords.toNat pd.initOffset.toNat pd.initSize.toNat

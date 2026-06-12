@@ -7,39 +7,39 @@ namespace Evm
 
 /--
 The execution envorinment `I` `ExecutionEnv`. Section 9.3.
-- `codeOwner` `Iₐ`
-- `sender`    `Iₒ`
-- `source`    `Iₛ`
-- `weiValue`  `Iᵥ`
+- `address` `Iₐ`
+- `origin`    `Iₒ`
+- `caller`    `Iₛ`
+- `value`     `Iᵥ`
 - `calldata` `I_d`
 - `code`      `I_b`
 - `gasPrice`  `Iₚ`
-- `header`    `I_H`
+- `blockHeader` `I_H`
 - `depth`     `Iₑ`
-- `perm`      `I_w`
+- `canModifyState` `I_w`
 -/
 structure ExecutionEnv where
-  codeOwner : AccountAddress
-  sender    : AccountAddress
-  source    : AccountAddress
-  weiValue  : UInt256
+  address   : AccountAddress
+  origin    : AccountAddress
+  caller    : AccountAddress
+  value     : UInt256
   calldata : ByteArray
   code      : ByteArray
   gasPrice  : ℕ
-  header    : BlockHeader
+  blockHeader : BlockHeader
   depth     : ℕ
-  perm      : Bool
+  canModifyState : Bool
   blobVersionedHashes : List ByteArray
   deriving BEq, Inhabited, Repr
 
 def prevRandao (e : ExecutionEnv) : UInt256 :=
-  e.header.prevRandao
+  e.blockHeader.prevRandao
 
 def basefee (e : ExecutionEnv) : UInt256 :=
-  .ofNat e.header.baseFeePerGas
+  .ofNat e.blockHeader.baseFeePerGas
 
 def ExecutionEnv.getBlobGasprice (e : ExecutionEnv) : UInt256 :=
-  .ofNat e.header.getBlobGasprice
+  .ofNat e.blockHeader.getBlobGasprice
 
 def blobhash (e : ExecutionEnv) (i : UInt256) : UInt256 :=
   e.blobVersionedHashes[i.toNat]?.option 0

@@ -38,20 +38,20 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
 
   let I : ExecutionEnv :=
     {
-      codeOwner := params.recipient        -- Equation (132)
-      sender    := params.origin           -- Equation (133)
+      address := params.recipient        -- Equation (132)
+      origin    := params.origin           -- Equation (133)
       gasPrice  := params.gasPrice.toNat   -- Equation (134)
       calldata  := params.calldata         -- Equation (135)
-      source    := params.caller           -- Equation (136)
-      weiValue  := params.apparentValue    -- Equation (137)
+      caller    := params.caller           -- Equation (136)
+      value  := params.apparentValue    -- Equation (137)
       depth     := params.depth            -- Equation (138)
-      perm      := params.canModifyState   -- Equation (139)
+      canModifyState      := params.canModifyState   -- Equation (139)
       -- Note that we don't use an address, but the actual code. Equation (141)-ish.
       code      :=
         match params.codeSource with
           | ToExecute.Precompiled _ => default
           | ToExecute.Code code => code
-      header    := params.blockHeader
+      blockHeader := params.blockHeader
       blobVersionedHashes := params.blobVersionedHashes
     }
 
@@ -85,8 +85,8 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
           validJumps := validJumpDests I.code 0
           exec :=
             { (default : ExecutionState) with
-                accountMap := σ₁
-                σ₀ := params.originalAccounts
+                accounts := σ₁
+                originalAccounts := params.originalAccounts
                 executionEnv := I
                 substate := params.substate
                 createdAccounts := params.createdAccounts
@@ -101,7 +101,7 @@ into the call's result, rolling back to the checkpoint on failure
 -/
 def endCall (checkpoint : Checkpoint) : FrameHalt → CallResult
   | .success exec output =>
-    let σ'' := exec.accountMap
+    let σ'' := exec.accounts
     { createdAccounts := exec.createdAccounts
       -- Equations (127) and (129)
       accounts := if σ'' == ∅ then checkpoint.accounts else σ''
@@ -140,7 +140,7 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
 
   let codeExecutionFailed   : Bool := !result.success
   let notEnoughFunds        : Bool :=
-    pd.value > (pd.callerAccounts.find? evmState.executionEnv.codeOwner |>.elim 0 (·.balance))
+    pd.value > (pd.callerAccounts.find? evmState.executionEnv.address |>.elim 0 (·.balance))
   let callDepthLimitReached : Bool := evmState.executionEnv.depth == 1024
   -- x = 0 if the code execution failed, there were not enough funds, or the
   -- call depth limit was reached; x = 1 otherwise.
@@ -156,7 +156,7 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
 
   let exec' : ExecutionState :=
     { evmState with
-        accountMap := result.accounts
+        accounts := result.accounts
         substate := result.substate
         createdAccounts := result.createdAccounts
         toMachineState := μ' }

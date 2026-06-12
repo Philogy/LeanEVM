@@ -116,7 +116,7 @@ def applyTransaction
 := do
   let { accounts := ypState, substate, success := statusCode, gasUsed := totalGasUsed } ←
     executeTransaction
-      s.accountMap
+      s.accounts
       header.baseFeePerGas
       header
       s.genesisBlockHeader
@@ -128,7 +128,7 @@ def applyTransaction
 
   let result : ExecutionState :=
     { s with
-      accountMap := ypState
+      accounts := ypState
       totalGasUsedInBlock := s.totalGasUsedInBlock + totalGasUsed.toNat
       transactionReceipts :=
         s.transactionReceipts.push
@@ -433,7 +433,7 @@ def validateBlock
       throw <| .BlockException .INVALID_WITHDRAWALS_ROOT
 
     let computedStateHash : UInt256 :=
-      stateTrieRoot state.accountMap.toPersistentAccountMap
+      stateTrieRoot state.accounts.toPersistentAccountMap
       |>.option 0 fromByteArrayBigEndian
       |> .ofNat
     if block.blockHeader.stateRoot ≠ computedStateHash then
@@ -491,7 +491,7 @@ def processBlocks
           let block ← deserializeRawBlock rawBlock
           let parent ←
             validateHeaderBeforeTransactions accState.blocks block.blockHeader
-          let accState ← processBlock {accState with accountMap := parent.σ} block
+          let accState ← processBlock {accState with accounts := parent.σ} block
           validateBlock accState parent.blockHeader block
           if ¬block.exception.isEmpty then
             throw <| .MissedExpectedException block.exception
@@ -499,7 +499,7 @@ def processBlocks
             { accState with
                 blocks :=
                   accState.blocks.push
-                    ⟨block.hash, block.blockHeader, accState.accountMap⟩
+                    ⟨block.hash, block.blockHeader, accState.accounts⟩
             }
         catch e =>
           match e with
@@ -524,7 +524,7 @@ def processBlocks
         0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02
       let SYSTEM_ADDRESS : AccountAddress :=
         0xfffffffffffffffffffffffffffffffffffffffe
-      match s₀.accountMap.find? BEACON_ROOTS_ADDRESS with
+      match s₀.accounts.find? BEACON_ROOTS_ADDRESS with
         | none => pure s₀
         | some roots =>
           let beaconRootsAddressCode := roots.code
@@ -535,8 +535,8 @@ def processBlocks
                 createdAccounts := .empty
                 genesisBlockHeader := s₀.genesisBlockHeader
                 blocks := s₀.blocks
-                accounts := s₀.accountMap
-                originalAccounts := s₀.accountMap
+                accounts := s₀.accounts
+                originalAccounts := s₀.accounts
                 substate := default
                 caller := SYSTEM_ADDRESS
                 origin := SYSTEM_ADDRESS
@@ -554,7 +554,7 @@ def processBlocks
             match beaconCallResult with
               | .ok r /- can't fail -/ => pure r.accounts
               | .error e => throw <| .ExecutionException e
-          let s := {s₀ with accountMap := σ}
+          let s := {s₀ with accounts := σ}
           pure s
 
     -- Transactions execution
@@ -563,7 +563,7 @@ def processBlocks
         (λ s' (tx, i) ↦ do
           let S_T ←
             validateTransaction
-              s'.accountMap
+              s'.accounts
               chainId
               block.blockHeader
               s'.totalGasUsedInBlock
@@ -574,9 +574,9 @@ def processBlocks
         {s with totalGasUsedInBlock := 0, transactionReceipts := .empty}
 
     -- Withdrawals execution
-    let σ := applyWithdrawals s.accountMap block.withdrawals.array
+    let σ := applyWithdrawals s.accounts block.withdrawals.array
 
-    pure { s with accountMap := σ }
+    pure { s with accounts := σ }
 
 /--
 - `.none` on success
@@ -590,11 +590,11 @@ def preImpliesPost (entry : TestEntry)
     let resultState ← processBlocks entry.pre entry.blocks entry.genesisRLP
     let lastAccountMap :=
       resultState.blocks.findRev? (·.hash == entry.lastblockhash)
-      |>.option resultState.accountMap ProcessedBlock.σ
+      |>.option resultState.accounts ProcessedBlock.σ
     let result : PersistentAccountMap :=
       lastAccountMap.foldl
         (λ r addr ⟨⟨nonce, balance, storage, code⟩, _, _⟩ ↦ r.insert addr ⟨nonce, balance, storage, code⟩) default
-    let persistentAccountMap := resultState.accountMap.toPersistentAccountMap
+    let persistentAccountMap := resultState.accounts.toPersistentAccountMap
     match entry.postState with
       | .Map post =>
         match almostBEqButNotQuite post result with
