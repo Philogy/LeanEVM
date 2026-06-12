@@ -1,197 +1,112 @@
-import Evm.Machine.Stack
-
-import Evm.State
 import Evm.Exception
-import Evm.StateOps
-import Evm.Machine.SharedStateOps
+import Evm.Machine.Stack
 import Evm.Machine.ExecutionState
 import Evm.Machine.ExecutionStateOps
+import Evm.Machine.MachineStateOps
+import Evm.Machine.SharedStateOps
+import Evm.Semantics.Frame
+import Evm.Semantics.Gas
+import Evm.Semantics.GasConstants
+import Evm.State
+import Evm.StateOps
+
+/-!
+The building blocks of the instruction dispatcher (`Evm.Semantics.Dispatch`):
+gas-charging helpers and the higher-order wrappers shared by the simple
+instruction arms. Every wrapper charges its (defaulted) cost itself, with the
+already-popped operands in hand.
+-/
 
 namespace Evm
 
+open GasConstants
 
+/-- The result of one instruction arm: a `Signal` or an exceptional halt. -/
+abbrev Step := Except ExecutionException Signal
 
-def Transformer := ExecutionState → Except ExecutionException ExecutionState
+instance : MonadLift Option (Except ExecutionException) :=
+  ⟨Option.option (.error .StackUnderflow) .ok⟩
 
-def execUnOp (f : Primop.Unary) : Transformer :=
-  λ s ↦
-    match s.stack.pop with
-      | some ⟨stack, a⟩ => Id.run do
-        .ok <| s.replaceStackAndIncrPC (stack.push <| f a)
-      | _ =>
-        .error .StackUnderflow
+/-- The frame continues executing with the updated state. -/
+@[inline] def continueWith (exec : ExecutionState) : Step := .ok (.next exec)
 
-def execBinOp (f : Primop.Binary) : Transformer :=
-  λ s ↦
-    match s.stack.pop2 with
-      | some ⟨stack, a, b⟩ => Id.run do
-        let result := f a b
-        .ok <| s.replaceStackAndIncrPC (stack.push result)
-      | _ =>
-        .error .StackUnderflow
+/-- Check-and-subtract a gas cost: `OutOfGass` when unaffordable. -/
+@[inline] def charge (cost : ℕ) (exec : ExecutionState) :
+    Except ExecutionException ExecutionState :=
+  if exec.gasAvailable.toNat < cost then .error .OutOfGass
+  else .ok { exec with gasAvailable := exec.gasAvailable - .ofNat cost }
 
-def execTriOp (f : Primop.Ternary) : Transformer :=
-  λ s ↦
-    match s.stack.pop3 with
-      | some ⟨stack, a, b, c⟩ => Id.run do
-        .ok <| s.replaceStackAndIncrPC (stack.push <| f a b c)
-      | _ =>
-        .error .StackUnderflow
+/--
+Charge the memory-expansion component of H.1 — `Cₘ(μᵢ′) − Cₘ(μᵢ)` with
+`μᵢ′ = M(μᵢ, offset, size)`. Only the cost is charged here; `activeWords`
+itself is updated by the instruction's own semantics.
+-/
+@[inline] def chargeMemExpansion (exec : ExecutionState) (offset size : ℕ) :
+    Except ExecutionException ExecutionState :=
+  let words' : UInt256 := .ofNat <| MachineState.M exec.activeWords.toNat offset size
+  charge (Cₘ words' - Cₘ exec.activeWords) exec
 
-def executionEnvOp (op : ExecutionEnv → UInt256) : Transformer :=
-  λ evmState ↦ Id.run do
-    let result := op evmState.executionEnv
-    .ok <|
-      evmState.replaceStackAndIncrPC (evmState.stack.push result)
+/-- `StaticModeViolation` unless the frame may modify state (the YP's `W` set, eq. 159). -/
+@[inline] def requireStateMod (exec : ExecutionState) : Except ExecutionException Unit :=
+  if exec.executionEnv.canModifyState then .ok () else .error .StaticModeViolation
 
-def unaryExecutionEnvOp (op : ExecutionEnv → UInt256 → UInt256) : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop with
-    | some ⟨ s , a⟩ => Id.run do
-      let result := op evmState.executionEnv a
-      .ok <|
-        evmState.replaceStackAndIncrPC (s.push result)
-    | _ => .error .StackUnderflow
+/-- Pop one word, push `f` of it. -/
+def unOp (f : UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
+  let exec ← charge cost exec
+  let (stack, a) ← exec.stack.pop
+  continueWith <| exec.replaceStackAndIncrPC (stack.push (f a))
 
-def machineStateOp (op : MachineState → UInt256) : Transformer :=
-  λ evmState ↦ Id.run do
-    let result := op evmState.toMachineState
-    .ok <|
-      evmState.replaceStackAndIncrPC (evmState.stack.push result)
+/-- Pop two words, push `f` of them. -/
+def binOp (f : UInt256 → UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
+  let exec ← charge cost exec
+  let (stack, a, b) ← exec.stack.pop2
+  continueWith <| exec.replaceStackAndIncrPC (stack.push (f a b))
 
-def binaryMachineStateOp
-  (op : MachineState → UInt256 → UInt256 → MachineState)
-    :
-  Transformer
-:= λ evmState ↦
-  match evmState.stack.pop2 with
-    | some ⟨ s , a, b ⟩ => Id.run do
-      let mState' := op evmState.toMachineState a b
-      let evmState' := {evmState with toMachineState := mState'}
-      .ok <| evmState'.replaceStackAndIncrPC s
-    | _ => .error .StackUnderflow
+/-- Pop three words, push `f` of them. -/
+def ternOp (f : UInt256 → UInt256 → UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
+  let exec ← charge cost exec
+  let (stack, a, b, c) ← exec.stack.pop3
+  continueWith <| exec.replaceStackAndIncrPC (stack.push (f a b c))
 
-def binaryMachineStateOp'
-  (op : MachineState → UInt256 → UInt256 → UInt256 × MachineState)
-    :
-  Transformer
-:= λ evmState ↦
-  match evmState.stack.pop2 with
-    | some ⟨ s , a, b ⟩ => Id.run do
-      let (val, mState') := op evmState.toMachineState a b
-      let evmState' := {evmState with toMachineState := mState'}
-      .ok <| evmState'.replaceStackAndIncrPC (s.push val)
-    | _ => .error .StackUnderflow
+/-- Push a value read from the execution state (environment/machine/world readers). -/
+def pushOp (v : ExecutionState → UInt256) (exec : ExecutionState) (cost : ℕ := Gbase) : Step := do
+  let exec ← charge cost exec
+  continueWith <| exec.replaceStackAndIncrPC (exec.stack.push (v exec))
 
-def ternaryMachineStateOp
-  (op : MachineState → UInt256 → UInt256 → UInt256 → MachineState)
-    :
-  Transformer
-:= λ evmState ↦
-  match evmState.stack.pop3 with
-    | some ⟨ s , a, b, c ⟩ => Id.run do
-      let mState' := op evmState.toMachineState a b c
-      let evmState' := {evmState with toMachineState := mState'}
-      .ok <| evmState'.replaceStackAndIncrPC s
-    | _ => .error .StackUnderflow
+/--
+Pop one word, apply a world-state operation returning the new state and the
+pushed value; the cost may depend on the popped operand (warm/cold access).
+-/
+def unStateOp (f : Evm.State → UInt256 → Evm.State × UInt256)
+    (cost : ExecutionState → UInt256 → ℕ) (exec : ExecutionState) : Step := do
+  let (stack, a) ← exec.stack.pop
+  let exec ← charge (cost exec a) exec
+  let (state', v) := f exec.toState a
+  continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toState := state' } (stack.push v)
 
-def binaryStateOp
-  (op : Evm.State → UInt256 → UInt256 → Evm.State)
-    :
-  Transformer
-:= λ evmState ↦
-  match evmState.stack.pop2 with
-    | some ⟨ s , a, b ⟩ => Id.run do
-      let state' := op evmState.toState a b
-      let evmState' := {evmState with toState := state'}
-      .ok <| evmState'.replaceStackAndIncrPC s
-    | _ => .error .StackUnderflow
+/-- DUPn (`n ∈ [1, 16]`). -/
+def dup (n : ℕ) (exec : ExecutionState) : Step := do
+  let exec ← charge Gverylow exec
+  let some v := exec.stack[n-1]? | throw .StackUnderflow
+  continueWith <| exec.replaceStackAndIncrPC (v :: exec.stack)
 
-def stateOp (op : Evm.State → UInt256) : Transformer :=
-  λ evmState ↦ Id.run do
-    .ok <|
-      evmState.replaceStackAndIncrPC (evmState.stack.push <| op evmState.toState)
+/-- SWAPn (`n ∈ [1, 16]`). -/
+def swap (n : ℕ) (exec : ExecutionState) : Step := do
+  let exec ← charge Gverylow exec
+  let top := exec.stack.take (n + 1)
+  let bottom := exec.stack.drop (n + 1)
+  if List.length top = (n + 1) then
+    continueWith <| exec.replaceStackAndIncrPC (top.getLast! :: top.tail!.dropLast ++ [top.head!] ++ bottom)
+  else
+    throw .StackUnderflow
 
-def unaryStateOp
-  (op : Evm.State → UInt256 → Evm.State × UInt256)
-    :
-  Transformer
-:= λ evmState ↦
-      match evmState.stack.pop with
-        | some ⟨stack' , a ⟩ => Id.run do
-          let (state', b) := op evmState.toState a
-          let evmState' := {evmState with toState := state'}
-          .ok <| evmState'.replaceStackAndIncrPC (stack'.push b)
-        | _ => .error .StackUnderflow
-
-def ternaryCopyOp
-  (op : SharedState → UInt256 → UInt256 → UInt256 → SharedState)
-    :
-  Transformer
-:= λ evmState ↦
-  match evmState.stack.pop3 with
-    | some ⟨ stack' , a, b, c⟩ => Id.run do
-      let sState' := op evmState.toSharedState a b c
-      let evmState' := { evmState with toSharedState := sState'}
-      .ok <| evmState'.replaceStackAndIncrPC stack'
-    | _ => .error .StackUnderflow
-
-def quaternaryCopyOp
-  (op : SharedState → UInt256 → UInt256 → UInt256 → UInt256 → SharedState)
-    :
-  Transformer
-:=  λ evmState ↦
-      match evmState.stack.pop4 with
-        | some ⟨ stack' , a, b, c, d⟩ => Id.run do
-          let sState' := op evmState.toSharedState a b c d
-          let evmState' := { evmState with toSharedState := sState'}
-          .ok <| evmState'.replaceStackAndIncrPC stack'
-        | _ => .error .StackUnderflow
-
-private def evmLogOp (evmState : ExecutionState) (a b : UInt256) (t : Array UInt256) : ExecutionState :=
-  let sharedState' := SharedState.logOp a b t evmState.toSharedState
-  { evmState with toSharedState := sharedState'}
-
-def log0Op : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop2 with
-      | some ⟨stack', a, b⟩ => Id.run do
-        let evmState' := evmLogOp evmState a b #[]
-        .ok <| evmState'.replaceStackAndIncrPC stack'
-      | _ => .error .StackUnderflow
-
-def log1Op : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop3 with
-      | some ⟨stack', a, b, c⟩ => Id.run do
-        let evmState' := evmLogOp evmState a b #[c]
-        .ok <| evmState'.replaceStackAndIncrPC stack'
-      | _ => .error .StackUnderflow
-
-def log2Op : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop4 with
-      | some ⟨stack', a, b, c, d⟩ => Id.run do
-        let evmState' := evmLogOp evmState a b #[c, d]
-        .ok <| evmState'.replaceStackAndIncrPC stack'
-      | _ => .error .StackUnderflow
-
-def log3Op : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop5 with
-      | some ⟨stack', a, b, c, d, μ₄⟩ => Id.run do
-        let evmState' := evmLogOp evmState a b #[c, d, μ₄]
-        .ok <| evmState'.replaceStackAndIncrPC stack'
-      | _ => .error .StackUnderflow
-
-def log4Op : Transformer :=
-  λ evmState ↦
-    match evmState.stack.pop6 with
-      | some ⟨stack', a, b, c, d, μ₄, μ₅⟩ => Id.run do
-        let evmState' := evmLogOp evmState a b #[c, d, μ₄, μ₅]
-        .ok <| evmState'.replaceStackAndIncrPC stack'
-      | _ => .error .StackUnderflow
-
-
+/-- LOG0–LOG4 tail: operands already popped, `topics` collected by the arm. -/
+def logArm (exec : ExecutionState) (stack : Stack UInt256) (offset size : UInt256)
+    (topics : Array UInt256) : Step := do
+  requireStateMod exec
+  let exec ← chargeMemExpansion exec offset.toNat size.toNat
+  let exec ← charge (logCost topics.size size) exec
+  let shared' := SharedState.logOp offset size topics exec.toSharedState
+  continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toSharedState := shared' } stack
 
 end Evm

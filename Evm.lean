@@ -30,12 +30,11 @@ import Evm.Semantics.Decode
 import Evm.Semantics.Frame
 import Evm.Semantics.Gas
 import Evm.Semantics.GasConstants
-import Evm.Semantics.Instructions
+import Evm.Semantics.Dispatch
 import Evm.Semantics.Interpreter
 import Evm.Semantics.Params
 import Evm.Semantics.Precompiles
 import Evm.Semantics.PrimOps
-import Evm.Semantics.Step
 import Evm.State
 import Evm.State.Account
 import Evm.State.AccountOps

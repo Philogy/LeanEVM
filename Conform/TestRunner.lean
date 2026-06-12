@@ -58,9 +58,6 @@ def TestMap.toTests (self : TestMap) : List (String × TestEntry) := self.toList
 
 def Post.toEVMState : Post → ExecutionState := PersistentAccountMap.toEVMState
 
-local instance : Inhabited Transformer where
-  default := λ _ ↦ default
-
 /--
 TODO - This should be a generic map complement, but we are not trying to write a library here.
 

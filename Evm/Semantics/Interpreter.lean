@@ -1,7 +1,7 @@
 import Evm.Semantics.Call
 import Evm.Semantics.Create
+import Evm.Semantics.Dispatch
 import Evm.Semantics.Frame
-import Evm.Semantics.Step
 
 namespace Evm
 
