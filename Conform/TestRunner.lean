@@ -656,13 +656,16 @@ parsed exactly once — scheduling is per-file so a fixture is never re-parsed
 per test.
 -/
 def processTestFile (path : System.FilePath) (isToBeTested : String → Bool)
-                    (isTimed : Option Nat := .none) :
+                    (isTimed : Option Nat := .none)
+                    (abort : Option (IO.Ref Bool) := .none) :
                     IO (Array TestId × Array (TestId × TestResult)) := do
   let mut discarded : Array TestId := .empty
   let mut results : Array (TestId × TestResult) := .empty
   let file ← Lean.Json.fromFile path
   let testNames := (Parser.testNamesOfTest file).toOption.getD #[] |>.filter isToBeTested
   for testName in testNames do
+    if let some a := abort then
+      if ← a.get then return (discarded, results)
     let testId : TestId := (path, testName)
     let test := Except.mapError Conform.Exception.CannotParse <| file.getObjValAs? TestEntry testName
     match test with

@@ -36,7 +36,8 @@ def testFiles (root               : System.FilePath)
               (fileFilter         : String := "")
               (phase              : ℕ)
               (threads            : ℕ := 1)
-              (timed              : Bool := false) : IO (Nat × Array String) := do
+              (timed              : Bool := false)
+              (failFast           : Option (Std.HashSet String) := .none) : IO (Nat × Array String) := do
   let isToBeTested (testname : String) : Bool :=
     let whitelist := testWhitelist
     let blacklist := testBlacklist ++ Evm.Conform.GlobalBlacklist
@@ -61,15 +62,24 @@ def testFiles (root               : System.FilePath)
   -- Each task reports completion through a shared counter, so progress
   -- (`[k/M files, n tests, f failed]`) and failures stream live.
   let progress ← IO.mkRef ((0, 0, 0) : ℕ × ℕ × ℕ)
+  let abort ← IO.mkRef false
   let numFiles := testFiles.size
   let mut tasks : Array (Task _) := .empty
   IO.println s!"Scheduling {numFiles} test files for parallel execution..."
   for path in testFiles do
     tasks := tasks.push <| ←IO.asTask do
+      if failFast.isSome ∧ (← abort.get) then
+        pure (#[], #[])
+      else
       let r ← Evm.Conform.processTestFile path isToBeTested (if timed then .some 0 else .none)
+        (abort := if failFast.isSome then some abort else none)
       let batchFails := r.2.filter (·.2.isSome)
       for ((file, test), _) in batchFails do
         IO.println s!"FAIL {file.fileName.getD file.toString}[{test}]"
+        if let some expected := failFast then
+          if !expected.contains s!"{file.fileName.getD file.toString}[{test}]" then
+            IO.println "fail-fast: aborting remaining tests"
+            abort.set true
       let (fs, ts, fl) ← progress.modifyGet λ (fs, ts, fl) ↦
         let v := (fs + 1, ts + r.2.size, fl + batchFails.size)
         (v, v)
@@ -86,7 +96,7 @@ def testFiles (root               : System.FilePath)
       log file test res phase
       if res.isNone
       then numSuccess := numSuccess + 1
-      else failedTests := failedTests.push test
+      else failedTests := failedTests.push s!"{file.fileName.getD file.toString}[{test}]"
   return (numSuccess, failedTests)
 
 def nproc : IO Nat := do
@@ -94,12 +104,16 @@ def nproc : IO Nat := do
   return out.stdout.trim.toNat? |>.getD 1
 
 def main (args : List String) : IO UInt32 := do
+  -- `--fail-fast`: the first failure outside ExpectedToFail aborts the run.
+  let failFastFlag := args.contains "--fail-fast"
+  let args := args.filter (· ≠ "--fail-fast")
   let NumThreads : ℕ := args.head? <&> String.toNat! |>.getD (←nproc)
 
   let ExpectedToFail : Std.HashSet String := {
     "invalid_block_blob_count.json[src/GeneralStateTestsFiller/Pyspecs/cancun/eip4844_blobs/test_blob_txs.py::test_invalid_block_blob_count[fork_Cancun-blockchain_test--blobs_per_tx_(7,)]]",
     "GasUsedHigherThanBlockGasLimitButNotWithRefundsSuicideLast.json[GasUsedHigherThanBlockGasLimitButNotWithRefundsSuicideLast_Cancun]"
   }
+  let ff : Option (Std.HashSet String) := if failFastFlag then some ExpectedToFail else none
 
   let DelayFiles : Array String :=
     #["static_Call50000bytesContract50_2_d1g0v0_Cancun",
@@ -125,7 +139,8 @@ def main (args : List String) : IO UInt32 := do
     let failed ← testFiles (root := "EthereumTests/BlockchainTests/")
                            (fileFilter := pat)
                            (phase := 0)
-                           (threads := NumThreads) >>= printResults
+                           (threads := NumThreads)
+                           (failFast := ff) >>= printResults
     return if (Std.HashSet.ofArray failed |>.diff ExpectedToFail).isEmpty then 0 else 1
 
   IO.println s!"Phase 1/3 - No performance tests."
@@ -133,18 +148,21 @@ def main (args : List String) : IO UInt32 := do
                           (directoryBlacklist := #["EthereumTests/BlockchainTests//GeneralStateTests/VMTests/vmPerformance"])
                           (testBlacklist := DelayFiles)
                           (phase := 1)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (failFast := ff) >>= printResults
   
   IO.println s!"Phase 2/3 - Performance tests only."
   let failed₂ ← testFiles (root := "EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmPerformance/")
                           (phase := 2)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (failFast := ff) >>= printResults
 
 
   IO.println s!"Phase 3/3 - Individually scheduled tests."
   let failed₃ ← testFiles (root := "EthereumTests/BlockchainTests/")
                           (testWhitelist := DelayFiles)
                           (phase := 3)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (failFast := ff) >>= printResults
 
   return if (Std.HashSet.ofArray (failed₁ ++ failed₂ ++ failed₃) |>.diff ExpectedToFail).isEmpty then 0 else 1
