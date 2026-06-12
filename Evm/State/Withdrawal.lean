@@ -1,4 +1,3 @@
--- Requires the following python packages: pycryptodome
 
 import Evm.Wheels
 import Evm.PerformIO

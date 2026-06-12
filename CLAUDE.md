@@ -14,16 +14,9 @@ a whole state root, storage tries included, in one process).
 
 ## Python
 
-**Always and only use `uv` for anything python.** Never `pip install` into the
-system or user site-packages, never `--break-system-packages`.
-
-Python is nearly gone: only `sign.py` (test-only helper) and the
-unused-by-conform `sha256.py` remain on it. If needed:
-
-```sh
-uv venv .venv
-uv pip install --python .venv/bin/python3 coincurve pycryptodome typing-extensions
-```
+There is no python in this repo (evmrs + C FFI replaced it). If python is ever
+needed for a one-off, **always and only use `uv`** — never `pip install` into
+the system or user site-packages, never `--break-system-packages`.
 
 ## Conform suite notes
 

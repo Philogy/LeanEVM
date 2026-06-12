@@ -5,8 +5,6 @@ Everything here is work in progress and is subject to change.
 # Requirements
 - Rust (cargo) — builds `tools/evmrs`, the native helper the conformance
   runner shells out to (built automatically by `lake build`).
-- Python via a repo-local uv venv (rare fallback paths only; see CLAUDE.md):
-  `uv venv .venv && uv pip install --python .venv/bin/python3 coincurve pycryptodome typing-extensions`
 
 # Project structure
 

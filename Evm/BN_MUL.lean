@@ -1,12 +1,12 @@
 import Evm.Wheels
 import Evm.PerformIO
-import Evm.Python
+import Evm.Evmrs
 import Conform.Wheels
 
 def blobBN_MUL (x₀ y₀ n : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
-    pythonCommandOfInput x₀ y₀ n
-  where pythonCommandOfInput (x₀ y₀ n : String) : IO.Process.SpawnArgs := {
+    evmrsCommandOfInput x₀ y₀ n
+  where evmrsCommandOfInput (x₀ y₀ n : String) : IO.Process.SpawnArgs := {
     cmd := evmrsExe,
     args := #["bn-mul", x₀, y₀, n]
   }

@@ -1,12 +1,12 @@
 import Evm.Wheels
 import Evm.PerformIO
-import Evm.Python
+import Evm.Evmrs
 import Conform.Wheels
 
 def blobSNARKV (data : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
-    pythonCommandOfInput data
-  where pythonCommandOfInput (data : String) : IO.Process.SpawnArgs := {
+    evmrsCommandOfInput data
+  where evmrsCommandOfInput (data : String) : IO.Process.SpawnArgs := {
     cmd := evmrsExe,
     args := #["snarkv", data]
   }

@@ -1,8 +1,6 @@
--- Requires the following python packages: coincurve, typing-extensions
-
 import Evm.Wheels
 import Evm.PerformIO
-import Evm.Python
+import Evm.Evmrs
 import Conform.Wheels
 import Evm.SpongeHash.Keccak256
 
@@ -10,28 +8,11 @@ def secp256k1n : ℕ := 11579208923731619542357098500868790785283756427907490438
 
 def blobECDSARECOVER (e v r s : String) : String :=
   totallySafePerformIO ∘ IO.Process.run <|
-    pythonCommandOfInput e v r s
-  where pythonCommandOfInput (e v r s : String) : IO.Process.SpawnArgs := {
+    evmrsCommandOfInput e v r s
+  where evmrsCommandOfInput (e v r s : String) : IO.Process.SpawnArgs := {
     cmd := evmrsExe,
     args := #["recover", e, v, r, s]
   }
-
-def blobSign (e pᵣ : String) : List String :=
-  (String.split · Char.isWhitespace |>.toList |>.map (·.toString)) ∘ totallySafePerformIO ∘ IO.Process.run <|
-    pythonCommandOfInput e pᵣ
-  where pythonCommandOfInput (e pᵣ : String) : IO.Process.SpawnArgs := {
-    cmd := pythonExe,
-    args := #["Evm/EllipticCurvesPy/sign.py", e, pᵣ]
-  }
-
--- Appendix F. Signing Transactions
-
-def ECDSASIGN (e pᵣ : ByteArray) : Except String (ByteArray × ByteArray × ByteArray) := do
-  let [r, s, v] := blobSign (toHex e) (toHex pᵣ) | .error "error"
-  let v ← ByteArray.ofBlob <| padLeft 2 v -- 2 characters means 1 byte
-  let r ← ByteArray.ofBlob <| padLeft 64 r -- 64 characters means 23
-  let s ← ByteArray.ofBlob <| padLeft 64 s -- 64 characters means 23
-  .ok (v, r, s)
 
 def ECDSARECOVER (e v r s : ByteArray) : Except String ByteArray :=
   match blobECDSARECOVER (toHex e) (toHex v) (toHex r) (toHex s) with

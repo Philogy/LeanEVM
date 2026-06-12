@@ -271,7 +271,7 @@ def validateTransaction
       | _ => ffi.KEC <| ByteArray.mk #[T.type] ++ T_RLP
 
   let (S_T : AccountAddress) ← -- (323)
-    -- Fixture-provided sender (when present) replaces the python-backed ECDSA
+    -- Fixture-provided sender (when present) replaces the evmrs-backed ECDSA
     -- recovery; the v/r/s validity checks above still run either way.
     match senderHint with
       | some sender => pure sender
@@ -426,8 +426,8 @@ def validateBlock
   if blobGasUsed > MAX_BLOB_GAS_PER_BLOCK then
     throw <| .BlockException .BLOB_GAS_USED_ABOVE_LIMIT
 
-  -- The trie-root checks below shell out to python per call (state root: per
-  -- contract account). They can only *detect* a divergence that the final
+  -- The trie-root checks below shell out to evmrs per call (state root: one
+  -- process). They can only *detect* a divergence that the final
   -- postState comparison detects anyway, so we run them solely for blocks that
   -- expect a block exception — where the specific exception is the oracle.
   let runExpensiveRootChecks := ¬block.exception.isEmpty

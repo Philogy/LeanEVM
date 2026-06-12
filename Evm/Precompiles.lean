@@ -8,12 +8,10 @@ import Evm.Exception
 import Evm.Wheels
 
 import Evm.EllipticCurves
-import Evm.SHA256
 import Evm.RIP160
 import Evm.BN_ADD
 import Evm.BN_MUL
 import Evm.SNARKV
-import Evm.BLAKE2_F
 import Evm.PointEval
 
 import Evm.FFI.ffi

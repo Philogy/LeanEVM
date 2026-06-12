@@ -75,7 +75,7 @@ def validateAccountAddress
   pure (.ofNat (fromByteArrayBigEndian a))
 
 /--
-`computeRoots := false` skips the (expensive, python-backed) transaction and
+`computeRoots := false` skips the (expensive, evmrs-backed) transaction and
 withdrawal trie-root computations; the corresponding `trieRoot` fields are left
 `.empty`. Only valid when the caller does not inspect them — the conform runner
 checks them only for blocks that expect a block exception.

@@ -769,32 +769,3 @@ def isCall : Operation → Bool
 
 
 end Operation
-
-open Evm.UInt256
-
-def exp (a b : UInt256) : UInt256 :=
-  a ^ b
-
-abbrev fromBool := Bool.toUInt256
-
-def lt (a b : UInt256) :=
-  fromBool (a < b)
-
-def gt (a b : UInt256) :=
-  fromBool (a > b)
-
--- def slt (a b : UInt256) :=
---   fromBool (Evm.UInt256.slt a b)
-
--- def sgt (a b : UInt256) :=
---   fromBool (Evm.UInt256.sgt a b)
-
-def eq (a b : UInt256) :=
-  fromBool (a = b)
-
-def isZero (a : UInt256) :=
-  fromBool (eq0 a)
-
-end Evm
-
-open Evm

@@ -1,4 +1,3 @@
-import Evm.BLAKE2_F
 import Evm.BN_ADD
 import Evm.BN_MUL
 import Evm.Data.Stack
@@ -16,6 +15,7 @@ import Evm.Maps.AccountMap
 import Evm.Maps.ByteMap
 import Evm.Maps.StorageMap
 import Evm.Operations
+import Evm.Evmrs
 import Evm.PerformIO
 import Evm.PointEval
 import Evm.Precompiles
@@ -30,7 +30,6 @@ import Evm.Semantics.Frame
 import Evm.Semantics.Interpreter
 import Evm.Semantics.Params
 import Evm.Semantics.Step
-import Evm.SHA256
 import Evm.SharedState
 import Evm.SharedStateOps
 import Evm.SNARKV
