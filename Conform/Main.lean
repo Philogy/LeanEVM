@@ -58,7 +58,7 @@ def testFiles (root               : System.FilePath)
       λ (json, filepath) ↦
         match json.getObj? with
         | .error _ => panic! "Malformed test json."
-        | .ok x => (filepath, x.toArray.map Sigma.fst |>.filter isToBeTested)  
+        | .ok x => (filepath, x.toArray.map Prod.fst |>.filter isToBeTested)
 
   let mut tasks : Array (Task _) := .empty
   let mut thread := 0

@@ -1,12 +1,13 @@
 import EvmYul.Wheels
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import Conform.Wheels
 
 def blobBN_ADD (x₀ y₀ x₁ y₁ : String) : String :=
-  totallySafePerformIO ∘ IO.Process.run <|
+  totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput x₀ y₀ x₁ y₁
   where pythonCommandOfInput (x₀ y₀ x₁ y₁ : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/bn_add.py", x₀, y₀, x₁, y₁]
   }
 

@@ -182,7 +182,7 @@ instance : FromJson TestMap where
 end FromJson
 
 def testNamesOfTest (test : Lean.Json) : Except String (Array String) :=
-  test.getObj? <&> (·.toArray.map Sigma.fst)
+  test.getObj? <&> (·.toArray.map Prod.fst)
 
 section PrettyPrinter
 

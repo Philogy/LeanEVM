@@ -1,12 +1,13 @@
 import EvmYul.Wheels
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import Conform.Wheels
 
 def blobSNARKV (data : String) : String :=
-  totallySafePerformIO ∘ IO.Process.run <|
+  totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput data
   where pythonCommandOfInput (data : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/snarkv.py", data]
   }
 

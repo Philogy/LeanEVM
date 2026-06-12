@@ -1,4 +1,5 @@
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import EvmYul.Wheels
 
 def blobComputeTrieRoot (ws : Array (String × String)) : String :=
@@ -6,26 +7,22 @@ def blobComputeTrieRoot (ws : Array (String × String)) : String :=
   -- dbg_trace s!"called blobComputeTrieRoot with data {ws[0]!.2.length}"
   
   totallySafePerformIO do
-    /-
-      Yes, this makes testing in parallel technically nondeterministic, but it is also the
-      fastest to implement.
-
-      This 'using a file trick' to get around big command line arguments should probably go
-      at some point.
-    -/
-    let entropy ← IO.getRandomBytes 3
-    let entropy' ← IO.monoNanosNow
-    let inputFile := s!"EvmYul/EllipticCurvesPy/trieInput_{entropy}{entropy'}.txt"
-    IO.FS.withFile inputFile .write λ h ↦
-      forM ws.toList λ s ↦ do
-        h.putStrLn s.1
-        h.putStrLn s.2
-    let result ← IO.Process.run (pythonCommandOfInput inputFile ws)
-    IO.FS.removeFile inputFile
-    pure result
+    let payload := ws.foldl (init := "") λ acc s ↦ acc ++ s.1 ++ "\n" ++ s.2 ++ "\n"
+    cachedPythonResult ("trie_root\n" ++ payload) do
+      /-
+        This 'using a file trick' to get around big command line arguments should probably go
+        at some point.
+      -/
+      let entropy ← IO.getRandomBytes 3
+      let entropy' ← IO.monoNanosNow
+      let inputFile := (← IO.FS.createTempDir) / s!"trieInput_{entropy}{entropy'}.txt"
+      IO.FS.writeFile inputFile payload
+      let result ← IO.Process.run (pythonCommandOfInput inputFile.toString ws)
+      IO.FS.removeFile inputFile
+      pure result
  where
   pythonCommandOfInput (inputFile : String) (ws : Array (String × String)) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args :=
       #["EvmYul/EllipticCurvesPy/trie_root.py"]
         ++ #[inputFile]

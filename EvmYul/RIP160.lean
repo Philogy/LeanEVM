@@ -1,12 +1,13 @@
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import EvmYul.Wheels
 import Conform.Wheels
 
 def blobRIP160 (d : String) : String :=
-  totallySafePerformIO ∘ IO.Process.run <|
+  totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput d
   where pythonCommandOfInput (d : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/rip160.py", d]
   }
 

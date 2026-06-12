@@ -1,13 +1,13 @@
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import EvmYul.Wheels
 import Conform.Wheels
 
 def blobSHA256 (d : String) : String :=
-  dbg_trace s!"EvmYul/EllipticCurvesPy/sha256.py"
-  totallySafePerformIO ∘ IO.Process.run <|
+  totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput d
   where pythonCommandOfInput (d : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/sha256.py", d]
   }
 

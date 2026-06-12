@@ -2,24 +2,25 @@
 
 import EvmYul.Wheels
 import EvmYul.PerformIO
+import EvmYul.CachedPython
 import Conform.Wheels
 import EvmYul.SpongeHash.Keccak256
 
 def secp256k1n : ℕ := 115792089237316195423570985008687907852837564279074904382605163141518161494337
 
 def blobECDSARECOVER (e v r s : String) : String :=
-  totallySafePerformIO ∘ IO.Process.run <|
+  totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput e v r s
   where pythonCommandOfInput (e v r s : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/recover.py", e, v, r, s]
   }
 
 def blobSign (e pᵣ : String) : List String :=
-  (String.split · Char.isWhitespace) ∘ totallySafePerformIO ∘ IO.Process.run <|
+  (String.split · Char.isWhitespace |>.toList |>.map (·.toString)) ∘ totallySafePerformIO ∘ cachedPythonRun <|
     pythonCommandOfInput e pᵣ
   where pythonCommandOfInput (e pᵣ : String) : IO.Process.SpawnArgs := {
-    cmd := "python3",
+    cmd := pythonExe,
     args := #["EvmYul/EllipticCurvesPy/sign.py", e, pᵣ]
   }
 
