@@ -34,6 +34,7 @@ structure CallParams where
   calldata            : ByteArray
   depth               : ℕ
   blockHeader         : BlockHeader
+  chainId             : UInt256
   canModifyState      : Bool
 
 /--
@@ -72,6 +73,7 @@ structure CreateParams where
   depth               : ℕ
   salt                : Option ByteArray
   blockHeader         : BlockHeader
+  chainId             : UInt256
   canModifyState      : Bool
 
 /--

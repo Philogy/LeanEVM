@@ -15,6 +15,7 @@ open Batteries (RBMap RBSet)
 
 /-- Execute one transaction — the YP's `Υ` (section 6). -/
 def executeTransaction
+  (chainId : UInt256)
   (accounts : AccountMap)
   (baseFee : ℕ)
   (header : BlockHeader)
@@ -90,6 +91,7 @@ def executeTransaction
               depth := 0
               salt := none
               blockHeader := header
+              chainId := chainId
               canModifyState := true }
         with
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
@@ -116,6 +118,7 @@ def executeTransaction
               calldata := tx.base.data
               depth := 0
               blockHeader := header
+              chainId := chainId
               canModifyState := true }
         with
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)

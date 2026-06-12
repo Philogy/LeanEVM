@@ -86,6 +86,7 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
     , depth     := params.depth
     , canModifyState      := params.canModifyState
     , blobVersionedHashes := params.blobVersionedHashes
+    , chainId   := params.chainId
     }
   .ok
     { kind := .create newAddress ⟨createdAccounts, accounts, substateWithNew⟩

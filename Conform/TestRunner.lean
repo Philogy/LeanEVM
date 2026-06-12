@@ -107,6 +107,8 @@ private def almostBEqButNotQuite (s₁ s₂ : PersistentAccountMap) : Except Str
 
 end
 
+def chainId : UInt256 := 1
+
 def applyTransaction
   (transaction : Transaction)
   (sender : AccountAddress)
@@ -116,6 +118,7 @@ def applyTransaction
 := do
   let { accounts := ypState, substate, success := statusCode, gasUsed := totalGasUsed } ←
     executeTransaction
+      chainId
       s.accounts
       header.baseFeePerGas
       header
@@ -549,6 +552,7 @@ def processBlocks
                 calldata := block.blockHeader.parentBeaconBlockRoot
                 depth := 0
                 blockHeader := block.blockHeader
+                chainId := chainId
                 canModifyState := true }
           let accounts ←
             match beaconCallResult with
@@ -564,7 +568,7 @@ def processBlocks
           let sender ←
             validateTransaction
               s'.accounts
-              chainId
+              chainId.toNat
               block.blockHeader
               s'.totalGasUsedInBlock
               tx

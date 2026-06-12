@@ -91,7 +91,7 @@ def difficulty (self : State) : UInt256 :=
 def gasLimit (self : State) : UInt256 :=
   .ofNat self.executionEnv.blockHeader.gasLimit
 
-def chainId (_ : State) : UInt256 := .ofNat Evm.chainId
+def chainId (s : State) : UInt256 := s.executionEnv.chainId
 
 def selfbalance (self : State) : UInt256 :=
   Batteries.RBMap.find? self.accounts self.executionEnv.address |>.elim 0 (·.balance)

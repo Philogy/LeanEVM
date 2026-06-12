@@ -53,6 +53,7 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
           | ToExecute.Code code => code
       blockHeader := params.blockHeader
       blobVersionedHashes := params.blobVersionedHashes
+      chainId   := params.chainId
     }
 
   match params.codeSource with

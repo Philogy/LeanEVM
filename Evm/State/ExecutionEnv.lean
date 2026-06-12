@@ -17,6 +17,7 @@ The execution envorinment `I` `ExecutionEnv`. Section 9.3.
 - `blockHeader` `I_H`
 - `depth`     `Iₑ`
 - `canModifyState` `I_w`
+- `chainId` `β`
 -/
 structure ExecutionEnv where
   address   : AccountAddress
@@ -30,6 +31,7 @@ structure ExecutionEnv where
   depth     : ℕ
   canModifyState : Bool
   blobVersionedHashes : List ByteArray
+  chainId   : UInt256 := 1
   deriving BEq, Inhabited, Repr
 
 def prevRandao (e : ExecutionEnv) : UInt256 :=

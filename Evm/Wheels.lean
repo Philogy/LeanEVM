@@ -14,8 +14,6 @@ def toHex (bytes : ByteArray) : String :=
 
 namespace Evm
 
-def chainId : ℕ := 1
-
 def UInt256.toByteArray (val : UInt256) : ByteArray :=
   let b := BE val.toNat
   ffi.ByteArray.zeroes ⟨32 - b.size⟩ ++ b

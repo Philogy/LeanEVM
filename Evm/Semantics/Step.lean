@@ -135,6 +135,7 @@ private def prepareCall (fr : Frame) (evmState : ExecutionState) (gasCost : ℕ)
         calldata := inputData
         depth := depth + 1
         blockHeader := evmState.executionEnv.blockHeader
+        chainId := evmState.executionEnv.chainId
         canModifyState := permission }                      -- I_w in Θ(.., I_W)
       pending
   else
@@ -203,6 +204,7 @@ private def prepareCreate (fr : Frame) (evmState : ExecutionState)
         depth := depth + 1
         salt := salt
         blockHeader := env.blockHeader
+        chainId := env.chainId
         canModifyState := env.canModifyState }
       pending
   return .next (← resumeAfterCreate failed pending).exec
