@@ -5,8 +5,6 @@ import Evm.Machine.SharedState
 
 namespace Evm
 
-
-
 /--
 The EVM execution state (extends Evm.SharedState).
 - `pc`         `pc`
@@ -26,7 +24,5 @@ structure ExecutionState extends Evm.SharedState where
 inductive ExecutionResult (S : Type) where
   | success (state : S) (o : ByteArray)
   | revert (g : UInt256) (o : ByteArray)
-
-
 
 end Evm
