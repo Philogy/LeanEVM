@@ -18,6 +18,39 @@ def directoryBlacklist : List System.FilePath := []
 def fileBlacklist : List System.FilePath := []
 
 /--
+The fast-mode fixture sample: a file runs iff its path contains one of these
+substrings. Curated for coverage (arithmetic/bitops, memory, storage +
+transient, logs, all call variants, creates, precompiles, reverts, static
+contexts, jumps, Cancun/Shanghai EIPs, block/RLP processing) within a <15s
+wall budget on 8 threads (~35s CPU total, slowest single test ~3.2s).
+-/
+def FastSample : Array String := #[
+  -- state tests: memory, calls, creates, precompiles, reverts, logs
+  "stExample", "stMemoryTest", "stCallCodes", "stCallDelegateCodesCallCodeHomestead",
+  "stCreateTest", "stPreCompiledContracts2", "stRevertTest", "stSelfBalance",
+  "stSpecialTest", "stLogTests",
+  -- VM opcode coverage
+  "VMTests/vmArithmeticTest", "VMTests/vmBitwiseLogicOperation",
+  "VMTests/vmIOandFlowOperations", "VMTests/vmLogTest", "VMTests/vmTests",
+  -- Cancun/Shanghai EIPs
+  "Pyspecs/cancun/eip1153_tstore", "Pyspecs/cancun/eip5656_mcopy",
+  "Pyspecs/cancun/eip4788_beacon_root", "Pyspecs/cancun/eip7516_blobgasfee",
+  "Pyspecs/shanghai/eip3855_push0", "Pyspecs/shanghai/eip3651_warm_coinbase",
+  "Pyspecs/shanghai/eip3860_initcode",
+  -- block-level processing (valid + invalid blocks, 1559 fee market)
+  "bcStateTests", "bcEIP1559", "bcExploitTest/SuicideIssue"
+]
+
+/--
+Single fixtures inside the fast sample that alone blow the wall budget
+(`run_until_out_of_gas` is 17.5s of looping until OOG — no extra coverage).
+The double slash matches `walkDir`'s join on a root ending in `/`.
+-/
+def FastSampleFileBlacklist : Array System.FilePath := #[
+  "EthereumTests/BlockchainTests//GeneralStateTests/Pyspecs/cancun/eip1153_tstore/run_until_out_of_gas.json"
+]
+
+/--
 Parse a fixture file once and spawn one pool task per (filtered) test —
 the parsed JSON is shared by reference across the file's test tasks. Returns
 the spawned tasks; the caller awaits them, so workers never block on nested
@@ -39,7 +72,7 @@ def testFiles (root               : System.FilePath)
               (fileBlacklist      : Array System.FilePath := #[])
               (testBlacklist      : Array String := #[])
               (testWhitelist      : Array String := #[])
-              (fileFilter         : String := "")
+              (fileFilters        : Array String := #[])
               (phase              : ℕ)
               (expectedToFail     : Std.HashSet String := {})
               (failFast           : Bool := false) : IO (Nat × Array String) := do
@@ -53,8 +86,9 @@ def testFiles (root               : System.FilePath)
       System.FilePath.walkDir root (pure <| · ∉ directoryBlacklist)
 
   let testFiles := testFiles.filter (· ∉ fileBlacklist)
+  -- A file runs if its path contains ANY of the filters (empty = no filter).
   let testFiles := testFiles.filter
-    λ f ↦ fileFilter.isEmpty || (f.toString.splitOn fileFilter).length != 1
+    λ f ↦ fileFilters.isEmpty || fileFilters.any λ pat ↦ (f.toString.splitOn pat).length != 1
 
   let mut discardedFiles : Array Evm.Conform.TestId := #[]
   let mut numSuccess := 0
@@ -120,15 +154,26 @@ def nproc : IO Nat := do
   return out.stdout.trimAscii.toNat? |>.getD 1
 
 def main (args : List String) : IO UInt32 := do
-  -- `--fail-fast`: the first failure outside ExpectedToFail aborts the run.
-  -- `--perf`: also run the throughput tests (vmPerformance + blake2f max
-  -- rounds) — minutes each, they stress raw interpreter speed, not semantics.
-  let failFastFlag := args.contains "--fail-fast"
-  let perfFlag := args.contains "--perf"
-  let args := args.filter (λ a ↦ a ≠ "--fail-fast" ∧ a ≠ "--perf")
+  -- Flags (allowed anywhere among the args):
+  --   --full      : the whole conformance phase (22,308 tests, ~2 min on 8
+  --                 threads). Default is the fast phase: the curated
+  --                 FastSample (~2,700 tests, <15s) — the iteration default.
+  --   --perf      : --full plus the throughput tests (vmPerformance + blake2f
+  --                 max rounds) — minutes each, they stress raw interpreter
+  --                 speed, not semantics.
+  --   --fail-fast : the first failure outside ExpectedToFail aborts the run.
+  let flags := args.filter (·.startsWith "--")
+  let positional := args.filter (!·.startsWith "--")
+  let failFastFlag := flags.contains "--fail-fast"
+  let perfFlag := flags.contains "--perf"
+  let fullFlag := flags.contains "--full" || perfFlag
+  for f in flags do
+    if f ∉ ["--full", "--perf", "--fail-fast"] then
+      IO.eprintln s!"Unknown flag: {f}"
+      return 2
   -- The first positional arg is accepted for compatibility but the task pool
   -- is sized at startup: set LEAN_NUM_THREADS to control parallelism.
-  let _threadCount : ℕ := args.head? <&> String.toNat! |>.getD (←nproc)
+  let _threadCount : ℕ := positional.head? >>= String.toNat? |>.getD (←nproc)
 
   let ExpectedToFail : Std.HashSet String := {
     "invalid_block_blob_count.json[src/GeneralStateTestsFiller/Pyspecs/cancun/eip4844_blobs/test_blob_txs.py::test_invalid_block_blob_count[fork_Cancun-blockchain_test--blobs_per_tx_(7,)]]",
@@ -149,11 +194,23 @@ def main (args : List String) : IO UInt32 := do
     if !unexpected.isEmpty then IO.println s!"Failed tests:\n{unexpected}"
     return failure
 
-  -- Optional second CLI arg: substring filter on fixture file paths.
-  -- Runs only matching files in a single phase — for quick samples and profiling.
-  if let some pat := args[1]? then
+  -- Optional second positional arg: substring filter on fixture file paths.
+  -- Runs only matching files in a single phase — for quick samples and
+  -- profiling. Bypasses fast mode and `--full`.
+  if let some pat := positional[1]? then
     let failed ← testFiles (root := "EthereumTests/BlockchainTests/")
-                           (fileFilter := pat)
+                           (fileFilters := #[pat])
+                           (phase := 0)
+                           (expectedToFail := ExpectedToFail)
+                           (failFast := failFastFlag) >>= printResults
+    return if (Std.HashSet.ofArray failed |>.diff ExpectedToFail).isEmpty then 0 else 1
+
+  if !fullFlag then
+    IO.println s!"Fast conformance sample (use --full for the whole suite)."
+    let failed ← testFiles (root := "EthereumTests/BlockchainTests/")
+                           (fileFilters := FastSample)
+                           (fileBlacklist := FastSampleFileBlacklist)
+                           (testBlacklist := PerfTests)
                            (phase := 0)
                            (expectedToFail := ExpectedToFail)
                            (failFast := failFastFlag) >>= printResults

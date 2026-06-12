@@ -82,20 +82,31 @@ Conform/
 To execute conformance tests, make sure the `EthereumTests` directory is the
 appropriate git submodule and run:
 ```
-lake test -- <NUM_THREADS>
+lake exe conform <NUM_THREADS>
 ```
 where `<NUM_THREADS>` is the number of threads running conformance tests in
 parallel (`nproc` does not exist on macOS, so always pass it explicitly).
 
-A second argument substring-filters fixture file paths, which is the
-recommended way to run quick samples while iterating:
+The default run executes the **fast phase**: a curated representative sample
+(`FastSample` in `Conform/Main.lean`, ~2,900 tests, <15s wall on 8 threads)
+covering arithmetic/bitops, memory, storage (+transient), logs, all call
+variants, creates, precompiles, reverts, static contexts, jumps, the Cancun
+and Shanghai EIPs, and block-level processing. This is the iteration
+default.
+
+Flags:
+- `--full` — the whole conformance phase (22,308 tests, ~2 minutes on 8
+  threads). This is what CI runs.
+- `--perf` — `--full` plus the throughput stress tests (`vmPerformance/` and
+  blake2f max rounds — minutes per test).
+- `--fail-fast` — abort the run on the first unexpected failure.
+
+A second positional argument substring-filters fixture file paths, which is
+the recommended way to run targeted samples while iterating:
 ```
 lake exe conform 8 stMemoryTest
 ```
 
-The default run executes the conformance phase only (~2 minutes on 8
-threads). `--perf` additionally runs the throughput stress tests
-(`vmPerformance/` and blake2f max rounds — minutes per test). Per-test
-results (with elapsed times) land in `tests_<phase>.txt`; expected failures
-are listed in `Conform/Main.lean`. `--fail-fast` aborts the run on the first
-unexpected failure.
+Per-test results (with elapsed times) land in `tests_<phase>.txt` (the fast
+phase and filtered samples use phase 0, `--full` uses phase 1); expected
+failures are listed in `Conform/Main.lean`.
