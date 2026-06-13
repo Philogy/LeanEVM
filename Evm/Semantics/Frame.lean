@@ -30,7 +30,7 @@ structure Frame where
 
 def Frame.get_dest (f : Frame) (dest : UInt256) : Option UInt32 := do
   let d ← dest.toUInt32?
-  f.validJumps.find? (fun actual => actual == d)
+  f.validJumps.find? (· == d)
 
 inductive FrameHalt where
   | success (exec : ExecutionState) (output : ByteArray)
