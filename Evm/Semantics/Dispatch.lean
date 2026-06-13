@@ -9,7 +9,7 @@ namespace Evm
 
 open GasConstants
 
-def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
+def dispatch (op : Operation) (arg : Option (UInt256 × UInt8)) (fr : Frame)
     (exec : ExecutionState) : Step :=
   match op with
     | .System s => systemOp s fr exec
@@ -103,9 +103,7 @@ def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
       let exec ← charge HASH_OPCODE_GAS exec
       continueWith <| exec.replaceStackAndIncrPC (stack.push (blobhash exec.executionEnv i))
     | .BLOBBASEFEE => pushOp (λ s ↦ s.executionEnv.getBlobGasprice) exec
-
     | .Smsf s => smsfOp s fr exec
-
     | .LOG0 => do
       let (stack, offset, size) ← exec.stack.pop2
       logArm exec stack offset size #[]
@@ -121,14 +119,11 @@ def dispatch (op : Operation) (arg : Option (UInt256 × Nat)) (fr : Frame)
     | .LOG4 => do
       let (stack, offset, size, t₁, t₂, t₃, t₄) ← exec.stack.pop6
       logArm exec stack offset size #[t₁, t₂, t₃, t₄]
-
-    | .Push .PUSH0 => do
-      let exec ← charge Gbase exec
-      continueWith <| exec.replaceStackAndIncrPC (exec.stack.push 0)
+    | .Push .PUSH0 => pushOp (fun _ => 0) exec
     | .Push _ => do
       let exec ← charge Gverylow exec
       let some (argVal, argWidth) := arg | throw .StackUnderflow
-      continueWith <| exec.replaceStackAndIncrPC (exec.stack.push argVal) (pcΔ := argWidth.succ)
+      continueWith <| exec.replaceStackAndIncrPC (exec.stack.push argVal) (pcΔ := argWidth + 1)
     | .Dup d => dup (dupIndex d) exec
     | .Swap s => swap (swapIndex s) exec
 

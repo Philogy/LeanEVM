@@ -20,13 +20,10 @@ namespace MachineState
 
 open Batteries (RBMap)
 
--- Appendix H, (320)
 def M (s f l : UInt64) : UInt64 :=
   match l with
   | 0 => s
   | l =>
-    -- ⌈ (f + l) ÷ 32 ⌉
-    -- The addition is not subject to s²⁵⁶ division (at least that's what MSTORE suggests)
     max s ((f + l + 31) / 32)
 
 def writeWord (self : MachineState) (addr val : UInt256) : MachineState :=

@@ -9,16 +9,14 @@ import Evm.Semantics.Params
 namespace Evm
 
 /--
-Enter a message call — the YP's `Θ` (eq. 119) up to the recursive code
-execution: value transfer (eq. 124–126), execution-environment construction
-(eq. 132–141), and precompile dispatch.
+Enter a message call up to recursive code execution: apply value transfer,
+construct the child environment, and dispatch precompiles.
 
 Returns `.inl frame` when EVM code must run (the driver descends into it) or
 `.inr result` when the call completes without code execution (precompiles).
 -/
 def beginCall (params : CallParams) : Frame ⊕ CallResult :=
   let accounts := params.accounts
-  -- (124) (125) (126)
   let accountsAfterCredit :=
     match accounts.find? params.recipient with
       | none =>
@@ -29,7 +27,6 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
       | some acc =>
         accounts.insert params.recipient { acc with balance := acc.balance + params.value }
 
-  -- If `v` ≠ 0 then the sender must have passed the `INSUFFICIENT_ACCOUNT_FUNDS` check
   let accountsAfterTransfer :=
     match accountsAfterCredit.find? params.caller with
       | none => accountsAfterCredit
@@ -38,15 +35,14 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
 
   let env : ExecutionEnv :=
     {
-      address := params.recipient        -- Equation (132)
-      origin    := params.origin           -- Equation (133)
-      gasPrice  := params.gasPrice.toNat   -- Equation (134)
-      calldata  := params.calldata         -- Equation (135)
-      caller    := params.caller           -- Equation (136)
-      value  := params.apparentValue    -- Equation (137)
-      depth     := params.depth            -- Equation (138)
-      canModifyState      := params.canModifyState   -- Equation (139)
-      -- Note that we don't use an address, but the actual code. Equation (141)-ish.
+      address := params.recipient
+      origin    := params.origin
+      gasPrice  := params.gasPrice.toNat
+      calldata  := params.calldata
+      caller    := params.caller
+      value  := params.apparentValue
+      depth     := params.depth
+      canModifyState      := params.canModifyState
       code      :=
         match params.codeSource with
           | ToExecute.Precompiled _ => default
@@ -70,11 +66,10 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
           | 8  => Precompiles.ecPairing        accountsAfterTransfer params.gas params.substate env
           | 9  => Precompiles.blake2f          accountsAfterTransfer params.gas params.substate env
           | 10 => Precompiles.pointEvaluation  accountsAfterTransfer params.gas params.substate env
-          | _  => (false, ∅, 0, params.substate, .empty) -- unreachable: `toExecute` yields 1–10 only
+          | _  => (false, ∅, 0, params.substate, .empty)
       .inr
         -- NB the precompile path historically clears `createdAccounts`; kept verbatim.
         { createdAccounts := ∅
-          -- Equations (127) and (129): an empty post-map signals failure — roll back.
           accounts := if accounts'' == ∅ then accounts else accounts''
           gasRemaining := gasRemaining
           substate := if accounts'' == ∅ then params.substate else substate''
@@ -95,16 +90,10 @@ def beginCall (params : CallParams) : Frame ⊕ CallResult :=
                 blocks := params.blocks
                 genesisBlockHeader := params.genesisBlockHeader } }
 
-/--
-Finish a message call — the YP's `Θ` after code execution: package the halt
-into the call's result, rolling back to the checkpoint on failure
-(eq. 127, 129).
--/
 def endCall (checkpoint : Checkpoint) : FrameHalt → CallResult
   | .success exec output =>
     let accounts'' := exec.accounts
     { createdAccounts := exec.createdAccounts
-      -- Equations (127) and (129)
       accounts := if accounts'' == ∅ then checkpoint.accounts else accounts''
       gasRemaining := exec.gasAvailable
       substate := if accounts'' == ∅ then checkpoint.substate else exec.substate
@@ -128,28 +117,24 @@ def endCall (checkpoint : Checkpoint) : FrameHalt → CallResult
 /--
 Resume a frame suspended on a CALL-family instruction: write the call output
 to memory, restore the returned gas, push the success flag, and advance the
-pc. This is the post-`Θ` tail of the CALL instructions.
+pc.
 -/
 def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
   let evmState := pd.frame.exec
   let output := result.output
-  -- outputWriteLen ≡ min({μs[6], ‖output‖})
   let outputWriteLen : ℕ := min pd.outSize.toNat output.size
-  -- μ′_m[μs[5] ... (μs[5] + outputWriteLen − 1)] = output[0 ... (outputWriteLen − 1)]
   let machineWithOutput := writeBytes output 0 evmState.toMachineState pd.outOffset.toNat outputWriteLen
-  let gasAfterReturn := machineWithOutput.gasAvailable + result.gasRemaining -- Ccall was subtracted as part of C
-
+  let gasAfterReturn := machineWithOutput.gasAvailable + result.gasRemaining
   let codeExecutionFailed   : Bool := !result.success
   let notEnoughFunds        : Bool :=
     pd.value > (pd.callerAccounts.find? evmState.executionEnv.address |>.elim 0 (·.balance))
   let callDepthLimitReached : Bool := evmState.executionEnv.depth == 1024
-  -- x = 0 if the code execution failed, there were not enough funds, or the
-  -- call depth limit was reached; x = 1 otherwise.
+  -- Push 0 on failure, insufficient funds, or call-depth limit; otherwise push 1.
   let x : UInt256 := if codeExecutionFailed || notEnoughFunds || callDepthLimitReached then 0 else 1
 
-  let μ' : MachineState :=
+  let machine' : MachineState :=
     { machineWithOutput with
-        returnData   := output -- μ′output = output
+        returnData   := output
         gasAvailable := gasAfterReturn
         activeWords :=
           let m := MachineState.M evmState.toMachineState.activeWords pd.inOffset pd.inSize
@@ -160,7 +145,7 @@ def resumeAfterCall (result : CallResult) (pd : PendingCall) : Frame :=
         accounts := result.accounts
         substate := result.substate
         createdAccounts := result.createdAccounts
-        toMachineState := μ' }
+        toMachineState := machine' }
   { pd.frame with exec := exec'.replaceStackAndIncrPC (pd.stack.push x) }
 
 end Evm

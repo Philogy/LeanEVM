@@ -5,20 +5,6 @@ import Evm.State.BlockHeader
 
 namespace Evm
 
-/--
-The execution envorinment `I` `ExecutionEnv`. Section 9.3.
-- `address` `Iₐ`
-- `origin`    `Iₒ`
-- `caller`    `Iₛ`
-- `value`     `Iᵥ`
-- `calldata` `I_d`
-- `code`      `I_b`
-- `gasPrice`  `Iₚ`
-- `blockHeader` `I_H`
-- `depth`     `Iₑ`
-- `canModifyState` `I_w`
-- `chainId` `β`
--/
 structure ExecutionEnv where
   address   : AccountAddress
   origin    : AccountAddress

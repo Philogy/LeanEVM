@@ -3,28 +3,6 @@ import Evm.Wheels
 
 namespace Evm
 
-/--
-`BlockHeader`. `H_<x>`. Section 4.3.
-
-`parentHash`    `p`
-`ommersHash`    `o`
-`beneficiary`   `c`
-`stateRoot`     `r`
-`transRoot`     `t`
-`receiptRoot`   `e`
-`logsBloom`     `b`
-`difficulty`    `d` [deprecated]
-`number`        `i`
-`gasLimit`      `l`
-`gasUsed`       `g`
-`timestamp`     `s`
-`extraData`     `x`
-`chainId`       `n` 
-`nonce`         `n` [deprecated]
-`baseFeePerGas` `f`
-`withdrawalsRoot` (EIP-4895)
-`parentBeaconBlockRoot` (EIP-4877)
--/
 structure BlockHeader where
   parentHash    : UInt256
   ommersHash    : UInt256

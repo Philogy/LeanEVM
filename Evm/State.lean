@@ -15,14 +15,7 @@ import Evm.Wheels
 
 namespace Evm
 
-/--
-The `State`. Section 9.3.
-
-- `accounts`     `accounts`
-- `substate`     `A`
-- `executionEnv` `I`
-- `totalGasUsedInBlock` `Υᵍ`
--/
+/-- Global execution state. -/
 structure State where
   accounts            : AccountMap
   originalAccounts    : AccountMap

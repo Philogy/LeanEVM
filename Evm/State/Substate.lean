@@ -38,15 +38,6 @@ abbrev LogSeries := Array LogEntry
 def LogSeries.toRlp (logSeries : LogSeries) : Rlp :=
   .list (logSeries.toList.map LogEntry.toRlp)
 
-/--
-The `Substate` `A`. Section 6.1.
-- `selfDestructSet`    `Aₛ`
-- `touchedAccounts`    `Aₜ`
-- `refundBalance`      `Aᵣ`
-- `accessedAccounts`   `Aₐ`
-- `accessedStorageKey` `Aₖ`
-- `logSeries`          `Aₗ`
--/
 structure Substate where
   selfDestructSet     : Batteries.RBSet AccountAddress compare
   touchedAccounts     : Batteries.RBSet AccountAddress compare
@@ -56,12 +47,8 @@ structure Substate where
   logSeries           : LogSeries
   deriving BEq, Inhabited, Repr
 
-/--
-  (63) `A0 ≡ (∅, (), ∅, 0, π, ∅)`
--/
 def initialSubstate : Substate := { (default : Substate) with accessedAccounts := precompileAddresses }
 
--- See the Bloom filter function M
 def bloomFilter (a : Array ByteArray) : ByteArray  :=
   let zeroes : ByteArray := ffi.ByteArray.zeroes 256
   a.foldl set3Bits zeroes

@@ -16,7 +16,7 @@ namespace Evm
 
 open Batteries (RBMap RBSet)
 
-/-- Execute one transaction — the YP's `Υ` (section 6). -/
+/-- Execute one transaction. -/
 def executeTransaction
   (chainId : UInt256)
   (accounts : AccountMap)
@@ -29,17 +29,17 @@ def executeTransaction
   : Except Exception TransactionResult
 := do
   let intrinsicCost : ℕ := intrinsicGas tx
-  -- "here can be no invalid transactions from this point"
+  -- No invalid transactions should reach this point.
   let senderAccount := (accounts.find? sender).get!
-  -- The priority fee (67)
+  -- The priority fee.
   let priorityFee :=
     match tx with
       | .legacy t | .access t =>
             t.gasPrice - .ofNat baseFee
       | .dynamic t | .blob t =>
             min t.maxPriorityFeePerGas (t.maxFeePerGas - .ofNat baseFee)
-  -- The effective gas price
-  let effectiveGasPrice := -- (66)
+  -- The effective gas price.
+  let effectiveGasPrice :=
     match tx with
       | .legacy t | .access t => t.gasPrice
       | .dynamic _ | .blob _ => priorityFee + .ofNat baseFee
@@ -51,29 +51,28 @@ def executeTransaction
           the sender balance before transaction execution and burned, and is not
           refunded in case of transaction failure."
         -/
-        balance := senderAccount.balance - UInt256.ofUInt64 tx.base.gasLimit * effectiveGasPrice - .ofNat (calcBlobFee header tx)  -- (74)
-        nonce := senderAccount.nonce + 1 -- (75)
+        balance := senderAccount.balance - UInt256.ofUInt64 tx.base.gasLimit * effectiveGasPrice - .ofNat (calcBlobFee header tx)
+        nonce := senderAccount.nonce + 1
     }
-  -- The checkpoint state (73)
+  -- The checkpoint state.
   let checkpointState := accounts.insert sender senderAccount
   let accessList := tx.getAccessList
-  let accessedStorageKeys : List (AccountAddress × UInt256) := do -- (78)
+  let accessedStorageKeys : List (AccountAddress × UInt256) := do
     let ⟨entryAddress, entryKeys⟩ ← accessList
     let entryKey ← entryKeys.toList
     pure (entryAddress, entryKey)
-  let baseAccessedAccounts := -- (80)
+  let baseAccessedAccounts :=
     initialSubstate.accessedAccounts.insert sender
       |>.insert header.beneficiary
       |>.union <| Batteries.RBSet.ofList (accessList.map Prod.fst) compare
-  -- (81)
   let gas : UInt64 := .ofNat <| tx.base.gasLimit.toNat - intrinsicCost
-  let accessedAccounts := -- (79)
+  let accessedAccounts :=
     match tx.base.recipient with
       | some t => baseAccessedAccounts.insert t
       | none => baseAccessedAccounts
-  let substate₀ := -- (77)
+  let substate0 :=
     { initialSubstate with accessedAccounts := accessedAccounts, accessedStorageKeys := Batteries.RBSet.ofList accessedStorageKeys Substate.storageKeysCmp}
-  let (/- provisional state -/ provisionalState, gasRemaining, substate, success) ← -- (76)
+  let (provisionalState, gasRemaining, substate, success) ←
     match tx.base.recipient with
       | none => do
         match
@@ -84,7 +83,7 @@ def executeTransaction
               blocks := blocks
               accounts := checkpointState
               originalAccounts := checkpointState
-              substate := substate₀
+              substate := substate0
               caller := sender
               origin := sender
               gas := gas
@@ -100,7 +99,7 @@ def executeTransaction
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
           | .error e => .error <| .ExecutionException e
       | some t =>
-        -- Proposition (71) suggests the recipient can be inexistent
+        -- The recipient may be inexistent.
         match
           messageCall
             { blobVersionedHashes := tx.blobVersionedHashes
@@ -109,7 +108,7 @@ def executeTransaction
               blocks := blocks
               accounts := checkpointState
               originalAccounts := checkpointState
-              substate := substate₀
+              substate := substate0
               caller := sender
               origin := sender
               recipient := t
@@ -126,10 +125,10 @@ def executeTransaction
         with
           | .ok r => pure (r.accounts, r.gasRemaining, r.substate, r.success)
           | .error e => .error <| .ExecutionException e
-  -- The amount to be refunded (82)
+  -- The amount to be refunded.
   let gasRefunded : UInt64 :=
     .ofNat <| gasRemaining.toNat + min ((tx.base.gasLimit.toNat - gasRemaining.toNat) / 5) substate.refundBalance.toNat
-  -- The pre-final state (83)
+  -- The pre-final state.
   let accountsWithRefund :=
     provisionalState.increaseBalance sender (UInt256.ofUInt64 gasRefunded * effectiveGasPrice)
 
@@ -138,9 +137,9 @@ def executeTransaction
     if beneficiaryFee != 0 then
       accountsWithRefund.increaseBalance header.beneficiary beneficiaryFee
     else accountsWithRefund
-  let accounts' := substate.selfDestructSet.1.foldl Batteries.RBMap.erase accountsWithFees -- (87)
+  let accounts' := substate.selfDestructSet.1.foldl Batteries.RBMap.erase accountsWithFees
   let deadAccounts := substate.touchedAccounts.filter (Evm.State.dead accountsWithFees ·)
-  let accounts' := deadAccounts.foldl Batteries.RBMap.erase accounts' -- (88)
+  let accounts' := deadAccounts.foldl Batteries.RBMap.erase accounts'
   let accounts' := accounts'.map λ (addr, acc) ↦ (addr, { acc with tstorage := .empty})
   .ok { accounts := accounts', substate := substate, success := success, gasUsed := tx.base.gasLimit - gasRefunded }
 

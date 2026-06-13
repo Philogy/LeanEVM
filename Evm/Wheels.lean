@@ -2,7 +2,6 @@ import Evm.UInt256
 import Mathlib.Data.Finmap
 import Evm.FFI.ffi
 
--- (195)
 def BE : ℕ → ByteArray := List.toByteArray ∘ Evm.toBytesBigEndian
 
 def hexOfByte (byte : UInt8) : String :=
@@ -86,22 +85,6 @@ def padLeft (n : ℕ) (s : String) :=
   let l := s.length
   if l < n then String.replicate (n - l) '0' ++ s else s
 
-/--
-TODO - Well this is ever so slightly unfortunate.
-It appears to be the case that some (all?) definitions that have C++ implementations
-use 64bit-width integers to hold numeric arguments.
-
-When this assumption is broken, e.g. `n : Nat := 2^64`, the Lean (4.9.0) gives
-inernal out of memory error.
-
-This implementation works around the issue at the price of using a slower implementation
-in case either of the arguments is too big.
--/
-def ByteArray.extract' (a : ByteArray) (b e : Nat) : ByteArray :=
-  -- TODO: Shouldn't (`e` - `b`) be < `2^64` instead of `e` since eventually `a.copySlice b empty 0 (e - b)` is called?
-  if b < 2^64 && e < 2^64
-  then a.extract b e -- NB only when `b` and `e` are sufficiently small
-  else ⟨⟨a.toList.drop b |>.take (e - b)⟩⟩
 
 def HexPrefix := "0x"
 

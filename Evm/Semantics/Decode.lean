@@ -7,8 +7,7 @@ import Evm.Wheels
 
 namespace Evm
 
-def pushArgWidth : Operation → ℕ
-  -- | .Push .PUSH0 => 0 is handled as default.
+def pushArgWidth : Operation → UInt8
   | .Push .PUSH1 => 1
   | .Push .PUSH2 => 2
   | .Push .PUSH3 => 3
@@ -43,7 +42,7 @@ def pushArgWidth : Operation → ℕ
   | .Push .PUSH32 => 32
   | _ => 0
 
-def nextInstrPos (pc : UInt32) (instr : Operation) := pc + 1 + .ofNat (pushArgWidth instr)
+def nextInstrPos (pc : UInt32) (instr : Operation) := pc + 1 + (pushArgWidth instr).toUInt32
 
 /--
 Returns the instruction from `arr` at `pc` assuming it is valid.
@@ -51,16 +50,17 @@ Returns the instruction from `arr` at `pc` assuming it is valid.
 The `Push` instruction also returns the argument as an EVM word along with the width of the instruction.
 -/
 def decode (arr : ByteArray) (pc : UInt32) :
-  Option (Operation × Option (UInt256 × Nat)) := do
+  Option (Operation × Option (UInt256 × UInt8)) := do
   let byte ← arr.get? pc.toNat
   let instr := Evm.parseInstr byte
   let argWidth := pushArgWidth instr
-  .some (
-    instr,
-    if argWidth == 0
-    then .none
-    else .some (Evm.uInt256OfByteArray (arr.extract' pc.toNat.succ (pc.toNat.succ + argWidth)), argWidth)
-  )
+  let immediate :=
+    if argWidth > 0
+    then
+      let pc' := pc.toNat + 1
+      .some (Evm.uInt256OfByteArray (arr.extract pc' (pc' + argWidth.toNat)), argWidth)
+    else .none
+  .some (instr, immediate)
 
 partial def validJumpDestsAux (c : ByteArray) (i : UInt32) (result : Array UInt32) : Array UInt32 :=
   match c.get? i.toNat with

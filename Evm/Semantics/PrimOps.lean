@@ -20,26 +20,18 @@ namespace Evm
 
 open GasConstants
 
-/-- The result of one instruction arm: a `Signal` or an exceptional halt. -/
 abbrev Step := Except ExecutionException Signal
 
 instance : MonadLift Option (Except ExecutionException) :=
   ⟨Option.option (.error .StackUnderflow) .ok⟩
 
-/-- The frame continues executing with the updated state. -/
 @[inline] def continueWith (exec : ExecutionState) : Step := .ok (.next exec)
 
-/-- Check-and-subtract a gas cost: `OutOfGas` when unaffordable. -/
 @[inline] def charge (cost : ℕ) (exec : ExecutionState) :
     Except ExecutionException ExecutionState :=
   if exec.gasAvailable.toNat < cost then .error .OutOfGas
   else .ok { exec with gasAvailable := exec.gasAvailable - .ofNat cost }
 
-/--
-Charge the memory-expansion component of H.1 — `Cₘ(μᵢ′) − Cₘ(μᵢ)` with
-`μᵢ′ = M(μᵢ, offset, size)`. Only the cost is charged here; `activeWords`
-itself is updated by the instruction's own semantics.
--/
 @[inline] def memoryExpansionWords? (activeWords : UInt64) (offset size : UInt256) : Option UInt64 := do
   if size == 0 then
     some activeWords
@@ -58,29 +50,24 @@ itself is updated by the instruction's own semantics.
     | none => .error .OutOfGas
     | some words' => charge (Cₘ words' - Cₘ exec.activeWords) exec
 
-/-- `StaticModeViolation` unless the frame may modify state (the YP's `W` set, eq. 159). -/
 @[inline] def requireStateMod (exec : ExecutionState) : Except ExecutionException Unit :=
   if exec.executionEnv.canModifyState then .ok () else .error .StaticModeViolation
 
-/-- Pop one word, push `f` of it. -/
 def unOp (f : UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
   let exec ← charge cost exec
   let (stack, a) ← exec.stack.pop
   continueWith <| exec.replaceStackAndIncrPC (stack.push (f a))
 
-/-- Pop two words, push `f` of them. -/
 def binOp (f : UInt256 → UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
   let exec ← charge cost exec
   let (stack, a, b) ← exec.stack.pop2
   continueWith <| exec.replaceStackAndIncrPC (stack.push (f a b))
 
-/-- Pop three words, push `f` of them. -/
 def ternOp (f : UInt256 → UInt256 → UInt256 → UInt256) (exec : ExecutionState) (cost : ℕ := Gverylow) : Step := do
   let exec ← charge cost exec
   let (stack, a, b, c) ← exec.stack.pop3
   continueWith <| exec.replaceStackAndIncrPC (stack.push (f a b c))
 
-/-- Push a value read from the execution state (environment/machine/world readers). -/
 def pushOp (v : ExecutionState → UInt256) (exec : ExecutionState) (cost : ℕ := Gbase) : Step := do
   let exec ← charge cost exec
   continueWith <| exec.replaceStackAndIncrPC (exec.stack.push (v exec))
@@ -96,13 +83,11 @@ def unStateOp (f : Evm.State → UInt256 → Evm.State × UInt256)
   let (state', v) := f exec.toState a
   continueWith <| ExecutionState.replaceStackAndIncrPC { exec with toState := state' } (stack.push v)
 
-/-- DUPn (`n ∈ [1, 16]`). -/
 def dup (n : ℕ) (exec : ExecutionState) : Step := do
   let exec ← charge Gverylow exec
   let some v := exec.stack[n-1]? | throw .StackUnderflow
   continueWith <| exec.replaceStackAndIncrPC (v :: exec.stack)
 
-/-- SWAPn (`n ∈ [1, 16]`). -/
 def swap (n : ℕ) (exec : ExecutionState) : Step := do
   let exec ← charge Gverylow exec
   let top := exec.stack.take (n + 1)
@@ -112,7 +97,6 @@ def swap (n : ℕ) (exec : ExecutionState) : Step := do
   else
     throw .StackUnderflow
 
-/-- LOG0–LOG4 tail: operands already popped, `topics` collected by the arm. -/
 def logArm (exec : ExecutionState) (stack : Stack UInt256) (offset size : UInt256)
     (topics : Array UInt256) : Step := do
   requireStateMod exec

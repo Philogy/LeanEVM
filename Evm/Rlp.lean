@@ -1,9 +1,7 @@
 import Evm.UInt256
 import Evm.Wheels
 
-/--
-An RLP item (the YP's `𝕋`, Appendix B): a byte string or a list of items.
--/
+/-- An RLP item: a byte string or a list of items. -/
 inductive Rlp where
   | bytes : ByteArray → Rlp
   | list  : (List Rlp) → Rlp
@@ -107,7 +105,7 @@ partial def decode (rlp : ByteArray) : Option Rlp := do
       let l ← items.mapM decode
       some (.list l)
 
-/-- The byte-string encoder `R_b` (eq. 180). -/
+/-- Encode an RLP byte string. -/
 private def encodeBytes (x : ByteArray) : Option ByteArray :=
   if x.size = 1 ∧ x.get! 0 < 128 then some x
   else
@@ -120,7 +118,7 @@ private def encodeBytes (x : ByteArray) : Option ByteArray :=
 
 mutual
 
-/-- The list-payload concatenation `s` (eq. 184). -/
+/-- Encode and concatenate an RLP list payload. -/
 private def encodeItems (l : List Rlp) : Option ByteArray :=
   match l with
     | [] => some .empty
@@ -130,7 +128,7 @@ private def encodeItems (l : List Rlp) : Option ByteArray :=
         | _        , none      => none
         | some rlpₗ, some rlpᵣ => rlpₗ ++ rlpᵣ
 
-/-- The list encoder `R_l` (eq. 183). -/
+/-- Encode an RLP list. -/
 def encodeList (l : List Rlp) : Option ByteArray :=
   match encodeItems l with
     | none => none
@@ -143,7 +141,7 @@ def encodeList (l : List Rlp) : Option ByteArray :=
           some <| [⟨247 + be.size⟩].toByteArray ++ be ++ s_x
         else none
 
-/-- RLP-encode an item (the YP's `RLP`, eq. 179). -/
+/-- Encode an RLP item. -/
 def encode (t : Rlp) : Option ByteArray :=
   match t with
     | .bytes ba => encodeBytes ba

@@ -239,7 +239,7 @@ def xor (a b : UInt256) : UInt256 :=
   ⟨a.l0 ^^^ b.l0, a.l1 ^^^ b.l1, a.l2 ^^^ b.l2, a.l3 ^^^ b.l3,
    a.l4 ^^^ b.l4, a.l5 ^^^ b.l5, a.l6 ^^^ b.l6, a.l7 ^^^ b.l7⟩
 
-/-- Bitwise NOT (the Yellow Paper's `complement`, i.e. `2^256 - 1 - a`). -/
+/-- Bitwise NOT. -/
 def complement (a : UInt256) : UInt256 :=
   ⟨~~~a.l0, ~~~a.l1, ~~~a.l2, ~~~a.l3, ~~~a.l4, ~~~a.l5, ~~~a.l6, ~~~a.l7⟩
 

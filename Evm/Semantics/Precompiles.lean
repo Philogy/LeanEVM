@@ -146,8 +146,6 @@ def modExp
   let base_length := nat_of_slice data 0 32
   let exp_length := nat_of_slice data 32 32
   let modulus_length := nat_of_slice data 64 32
-  -- Pseudo laziness
-  -- We don't want to call `nat_of_slice` unless we need it
   let exp := λ () ↦ nat_of_slice data (96 + base_length) exp_length
 
   let requiredGas :=
@@ -211,7 +209,6 @@ def ecAdd
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error _ =>
-        -- (accounts, gas - requiredGas, substate, .empty)
         (false, ∅, 0, substate, .empty)
 
 def ecMul
@@ -234,7 +231,6 @@ def ecMul
     match o with
       | .ok o => (true, accounts, gas - .ofNat requiredGas, substate, o)
       | .error _ =>
-        -- (accounts, gas - requiredGas, substate, .empty)
         (false, ∅, 0, substate, .empty)
 
 def ecPairing

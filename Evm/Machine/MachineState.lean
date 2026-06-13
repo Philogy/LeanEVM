@@ -14,14 +14,10 @@ instance : DecidableEq ByteArray
     | isFalse h₂ => isFalse <| λ h ↦ by cases h; exact (h₂ rfl)
 
 /--
-The partial shared `MachineState` `μ`. Section 9.4.1.
-- `gasAvailable` `g`
-- `memory`       `m`
-- `activeWords`  `i` - # active words.
-- `returnData`   `o` - Data from the previous call from the current environment.
+Mutable machine state for the current frame.
 
-(The RETURN/REVERT payload is not machine state: the halting instruction
-delivers it directly in its `Signal`.)
+The RETURN/REVERT payload is delivered directly in the halt signal rather than
+stored here.
 -/
 structure MachineState where
   gasAvailable        : UInt64
@@ -29,14 +25,5 @@ structure MachineState where
   memory              : ByteArray
   returnData          : ByteArray
   deriving Inhabited
-
--- inductive WordSize := | Standard | Single
-
--- def WordSize.toNat (this : WordSize) : ℕ :=
---   match this with
---     | WordSize.Standard => 32
---     | WordSize.Single   => 1
-
--- instance : Coe WordSize Nat := ⟨WordSize.toNat⟩
 
 end Evm

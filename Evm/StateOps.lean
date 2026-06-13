@@ -17,9 +17,6 @@ def addAccessedAccount (self : State) (addr : AccountAddress) : State :=
 def addAccessedStorageKey (self : State) (sk : AccountAddress × UInt256) : State :=
   { self with substate := self.substate.addAccessedStorageKey sk }
 
-/--
-DEAD(accounts, a). Section 4.1., equation 15.
--/
 def dead (accounts : AccountMap) (addr : AccountAddress) : Bool :=
   accounts.find? addr |>.option True Account.emptyAccount
 
@@ -129,20 +126,20 @@ def sstore (self : State) (spos sval : UInt256) : State :=
     if originalValue = newValue && originalValue ≠ .ofNat 0 then GasConstants.Gsreset - GasConstants.Gwarmaccess else
     0
 
-  let ΔAᵣ : ℤ :=
+  let refundDelta : ℤ :=
     if currentValue ≠ newValue && originalValue = currentValue && newValue = .ofNat 0 then GasConstants.Rsclear else
     if currentValue ≠ newValue && originalValue ≠ currentValue then r_dirtyclear + r_dirtyreset else
     0
 
-  let newAᵣ : UInt256 :=
-    match ΔAᵣ with
+  let refundBalance' : UInt256 :=
+    match refundDelta with
       | .ofNat n => self.substate.refundBalance + .ofNat n
       | .negSucc n => self.substate.refundBalance - .ofNat n - 1
   self.lookupAccount selfAddress |>.option self λ acc ↦
     let self' :=
       self.setAccount selfAddress (acc.updateStorage spos sval)
         |>.addAccessedStorageKey (selfAddress, spos)
-    { self' with substate.refundBalance := newAᵣ }
+    { self' with substate.refundBalance := refundBalance' }
 
 def tload (self : State) (spos : UInt256) : State × UInt256 :=
   let selfAddress := self.executionEnv.address

@@ -5,19 +5,16 @@ import Evm.Semantics.Frame
 
 namespace Evm
 
-/-- Package a frame's halt into its result via the frame-kind's `end` function. -/
 def endFrame (fr : Frame) (halt : FrameHalt) : FrameResult :=
   match fr.kind with
     | .call checkpoint => .call (endCall checkpoint halt)
     | .create address checkpoint => .create (endCreate address checkpoint halt)
 
-/-- Resume a suspended parent frame with its child's result. -/
 def Pending.resume (p : Pending) (result : FrameResult) : Except ExecutionException Frame :=
   match p with
     | .call pd => .ok (resumeAfterCall result.toCallResult pd)
     | .create pd => resumeAfterCreate result.toCreateResult pd
 
-/-- The suspended parent frame of a pending call/create. -/
 def Pending.frame : Pending → Frame
   | .call pd => pd.frame
   | .create pd => pd.frame
@@ -64,9 +61,8 @@ def drive (fuel : ℕ) (stack : List Pending) (state : Frame ⊕ FrameResult) :
               match beginCreate params with
                 | .ok child => drive fuel (.create pending :: stack) (.inl child)
                 | .error _ =>
-                  -- Mirrors the historical behavior of a faulting `Λ`: the
-                  -- CREATE instruction completes with a zeroed result and an
-                  -- emptied account map.
+                  -- Historical behavior: a faulting CREATE completes with a
+                  -- zeroed result and an emptied account map.
                   let exec := pending.frame.exec
                   let result : CreateResult :=
                     { address := 0
@@ -85,20 +81,11 @@ generous (see `drive`): instructions cost ≥ 1 gas each and descents ≥ 100, s
 -/
 def seedFuel (gas : UInt64) : ℕ := 2 * gas.toNat + 4096
 
-/--
-Message call — the YP's `Θ` (eq. 119): execute `params.codeSource` in the
-context described by `params`, returning the final world state, remaining
-gas, and output.
--/
 def messageCall (params : CallParams) : Except ExecutionException CallResult :=
   match beginCall params with
     | .inr result => .ok result
     | .inl frame => FrameResult.toCallResult <$> drive (seedFuel params.gas) [] (.inl frame)
 
-/--
-Contract creation — the YP's `Λ` (eq. 93): derive the new address, run the
-init code, and deposit the returned code.
--/
 def createContract (params : CreateParams) : Except ExecutionException CreateResult := do
   let frame ← beginCreate params
   FrameResult.toCreateResult <$> drive (seedFuel params.gas) [] (.inl frame)

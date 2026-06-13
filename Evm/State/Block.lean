@@ -150,9 +150,9 @@ def deserializeBlock
       dbg_trace "RLP error: parseBlobVersionHash"
       throw <| .BlockException .RLP_STRUCTURES_ENCODING
   parseTransaction : Rlp → Except Exception Transaction
-    | .bytes typePlusPayload => -- Transaction type > 0
+    | .bytes typePlusPayload =>
       match Rlp.decode (typePlusPayload.extract 1 typePlusPayload.size) with
-        | some -- Type 3 transactions
+        | some
           (.list
             [ .bytes chainId
             , .bytes nonce
@@ -203,7 +203,7 @@ def deserializeBlock
                 dynamicFeeTransaction
                   maxFeePerBlobGas
                   blobVersionedHashes
-        | some -- Type 2 transactions
+        | some
           (.list
             [ .bytes chainId
             , .bytes nonce
@@ -247,7 +247,7 @@ def deserializeBlock
                 base
                 withAccessList
                 maxFeePerGas maxPriorityFeePerGas
-        | some -- Type 1 transactions
+        | some
           (.list
             [ .bytes chainId
             , .bytes nonce

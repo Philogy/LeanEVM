@@ -11,18 +11,6 @@ namespace Evm
 
 open Batteries (RBMap RBSet)
 
--- "All transaction types specify a number of common fields:"
-/--
-`BaseTransaction`. Section 4.3.
-
-- `nonce`     `n`
-- `gasLimit`  `g`
-- `recipinet` `t`
-- `value`     `v`
-- `r`         `r`
-- `s`         `s`
-- `data`      `d/i`
--/
 structure Transaction.Base where
   nonce           : UInt64
   gasLimit        : UInt64
@@ -33,77 +21,24 @@ structure Transaction.Base where
   data            : ByteArray
 deriving BEq, Repr
 
--- "EIP-2930 (type 1) and EIP-1559 (type 2) transactions also have:""
-/--
-`AccessList`. EIP-2930.
-- `chainId`    `c`
-- `accessList` `A`
-- `yParity`    `y`
--/
 structure Transaction.WithAccessList where
   chainId : UInt256
   accessList : List (AccountAddress × Array UInt256)
   yParity : UInt256
 deriving BEq, Repr
 
--- "type 0 and type 1 transactions specify gas price as a single value:"
-/--
-`WithGasPrice`. Section 4.3.
-- `gasPrice` `p`
--/
 structure Transaction.WithGasPrice where
   gasPrice : UInt256
 deriving BEq, Repr
 
--- Legacy transactions do not have an `accessList`, while `chainId` and `yParity` for legacy transactions are combined into a single value:
-/--
-Type 0: `LegacyTransaction`. Section 4.3.
-- `nonce`     `n`
-- `gasLimit`  `g`
-- `recipinet` `t`
-- `value`     `v`
-- `r`         `r`
-- `s`         `s`
-- `data`      `d/i`
-- `gasPrice` `p`
-- `w` `w`
--/
 structure LegacyTransaction extends Transaction.Base, Transaction.WithGasPrice where
   w: UInt256
 deriving BEq, Repr
 
-/-- Type 1: `AccessListTransaction`
-- `nonce`     `n`
-- `gasLimit`  `g`
-- `recipinet` `t`
-- `value`     `v`
-- `r`         `r`
-- `s`         `s`
-- `data`      `d/i`
-- `chainId`    `c`
-- `accessList` `A`
-- `yParity`    `y`
-- `gasPrice` `p`
--/
 structure AccessListTransaction
   extends Transaction.Base, Transaction.WithAccessList, Transaction.WithGasPrice
 deriving BEq, Repr
 
-/--
-Type 2: `DynamicFeeTransaction`
-- `nonce`                `n`
-- `gasLimit`             `g`
-- `recipinet`            `t`
-- `value`                `v`
-- `r`                    `r`
-- `s`                    `s`
-- `data`                 `d/i`
-- `chainId`              `c`
-- `accessList`           `A`
-- `yParity`              `y`
-- `maxFeePerGas`         `m`
-- `maxPriorityFeePerGas` `f`
--/
 structure DynamicFeeTransaction extends Transaction.Base, Transaction.WithAccessList where
   maxFeePerGas         : UInt256
   maxPriorityFeePerGas : UInt256
@@ -150,11 +85,11 @@ def Transaction.computeTrieRoot (ts : Array ByteArray) : Option ByteArray := do
     | some ws => (ByteArray.ofBlob (blobComputeTrieRoot ws)).toOption
 
 structure TransactionReceipt where
-  type                     : UInt8     /- R_x -/
-  statusCode               : Bool      /- R_z -/
-  cumulativeGasUsedInBlock : ℕ         /- R_u -/
-  bloomFilter              : ByteArray /- R_b -/
-  logSeries                : LogSeries /- Rlp.encodeList -/
+  type                     : UInt8
+  statusCode               : Bool
+  cumulativeGasUsedInBlock : ℕ
+  bloomFilter              : ByteArray
+  logSeries                : LogSeries
 deriving BEq, Inhabited, Repr
 
 def TransactionReceipt.toRlp : TransactionReceipt → Rlp
@@ -171,7 +106,6 @@ def TransactionReceipt.toBlobs (w : ℕ × ByteArray) : Option (String × String
   let rlp ← w.2
   pure (toHex rlpᵢ, toHex rlp)
 
--- EIP-4895
 def TransactionReceipt.computeTrieRoot (ws : Array ByteArray) : Option ByteArray := do
   match Array.mapM TransactionReceipt.toBlobs ((Array.range ws.size).zip ws) with
     | none => .none

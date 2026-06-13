@@ -68,7 +68,7 @@ instance : FromJson BlockHeader where
         gasUsed               := ← json.getObjValAsD! ℕ              "gasUsed"
         timestamp             := ← json.getObjValAsD! ℕ              "timestamp"
         extraData             := ← json.getObjValAsD! ByteArray      "extraData"
-        nonce                 := 0 -- [deprecated] 0.
+        nonce                 := 0
         baseFeePerGas         := ← json.getObjValAsD! ℕ              "baseFeePerGas"
         parentBeaconBlockRoot := ← json.getObjValAsD! ByteArray      "parentBeaconBlockRoot"
         prevRandao            := ← json.getObjValAsD! UInt256        "mixHash"
@@ -113,7 +113,6 @@ instance : FromJson Transaction where
       | .error _ => do
         return .legacy ⟨baseTransaction, ⟨← json.getObjValAsD! UInt256 "gasPrice"⟩, ← json.getObjValAsD! UInt256 "v"⟩
       | .ok accessList => do
-        -- Any other transaction now necessarily has an access list.
         let accessListTransaction : Transaction.WithAccessList :=
           {
             chainId    := ← json.getObjValAsD UInt256 "chainId" 1
@@ -142,8 +141,9 @@ instance : FromJson Transaction where
                   ⟩
 
 /--
-- Format₀: `EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmArithmeticTest/add.json`
-- Format₁: `EthereumTests/BlockchainTests/GeneralStateTests/Pyspecs/cancun/eip4844_blobs/invalid_static_excess_blob_gas.json`
+Handles both fixture shapes used by blockchain tests:
+- `EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmArithmeticTest/add.json`
+- `EthereumTests/BlockchainTests/GeneralStateTests/Pyspecs/cancun/eip4844_blobs/invalid_static_excess_blob_gas.json`
 -/
 private def blockOfJson (json : Json) : Except String RawBlock := do
   -- The exception, if exists, is always in the outermost object regardless of the `<Format>` (see this function's docs).

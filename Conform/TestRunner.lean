@@ -58,49 +58,29 @@ def TestMap.toTests (self : TestMap) : List (String × TestEntry) := self.toList
 
 def Post.toEVMState : Post → ExecutionState := PersistentAccountMap.toEVMState
 
-/--
-TODO - This should be a generic map complement, but we are not trying to write a library here.
-
-Now that this is not a `Finmap`, this is probably defined somewhere in the API, fix later.
--/
-def storageComplement (m₁ m₂ : PersistentAccountMap) : PersistentAccountMap := Id.run do
-  let mut result : PersistentAccountMap := m₁
-  for ⟨k₂, v₂⟩ in m₂.toList do
-    match m₁.find? k₂ with
+def storageComplement (left right : PersistentAccountMap) : PersistentAccountMap := Id.run do
+  let mut result : PersistentAccountMap := left
+  for ⟨key, rightValue⟩ in right.toList do
+    match left.find? key with
     | .none => continue
-    | .some v₁ => if v₁ == v₂ then result := result.erase k₂ else continue
+    | .some leftValue => if leftValue == rightValue then result := result.erase key else continue
   return result
 
 /--
-Difference between `m₁` and `m₂`.
-Effectively `m₁ / m₂ × m₂ / m₁`.
-
-- if the `Δ = (∅, ∅)`, then `m₁ = m₂`
-- used for reporting delta between expected post state and the actual state post execution
-
-Now that this is not a `Finmap`, this is probably defined somewhere in the API, fix later.
+Difference between two persistent account maps, used for reporting mismatches
+between expected and actual post state.
 -/
-def storageΔ (m₁ m₂ : PersistentAccountMap) : PersistentAccountMap × PersistentAccountMap :=
-  (storageComplement m₁ m₂, storageComplement m₂ m₁)
+def storageDelta (left right : PersistentAccountMap) : PersistentAccountMap × PersistentAccountMap :=
+  (storageComplement left right, storageComplement right left)
 
 section
 
-/--
-This section exists for debugging / testing mostly. It's somewhat ad-hoc.
--/
+private def statesAlmostBEq (left right : PersistentAccountMap) : Except String Bool := do
+  if left == right then .ok true else throw "state mismatch"
 
-private def statesAlmostBEq (s₁ s₂ : PersistentAccountMap) : Except String Bool := do
-  if s₁ == s₂ then .ok true else throw "state mismatch"
-
-/--
-NB it is ever so slightly more convenient to be in `Except String Bool` here rather than `Option String`.
-
-This is morally `s₁ == s₂` except we get a convenient way to both tune what is being compared
-as well as report fine grained errors.
--/
-private def almostBEqButNotQuite (s₁ s₂ : PersistentAccountMap) : Except String Bool := do
-  discard <| statesAlmostBEq s₁ s₂
-  pure true -- Yes, we never return false, because we throw along the way. Yes, this is `Option`.
+private def almostBEqButNotQuite (left right : PersistentAccountMap) : Except String Bool := do
+  discard <| statesAlmostBEq left right
+  pure true
 
 end
 
@@ -123,8 +103,6 @@ def applyTransaction
       s.blocks
       transaction
       sender
-
-  -- as EIP 4788 (https://eips.ethereum.org/EIPS/eip-4788).
 
   let result : ExecutionState :=
     { s with
@@ -155,7 +133,6 @@ def validateHeaderBeforeTransactions
     throw <| .BlockException .UNKNOWN_PARENT_ZERO
 
   let (some parent : Option ProcessedBlock) :=
-    -- Usually the parent is the last processed block
     blocks.findRev? λ b ↦ b.hash = header.parentHash
     | throw <| .BlockException .UNKNOWN_PARENT
 
@@ -205,7 +182,6 @@ def validateTransaction
       The test `lowGasPriceOldTypes_d0g0v0_Cancun` expects an
       `INSUFFICIENT_MAX_FEE_PER_GAS`, but its transaction doesn't have a
       `maxFeePerGas` field. We use `gasPrice` instead.
-      See the 7th test for intrinsic validity, Yellow Paper, Chapter 7
     -/
     match T with
       | .dynamic t | .blob t => t.maxFeePerGas
@@ -213,8 +189,8 @@ def validateTransaction
   if H_f > maxFeePerGas.toNat then
     throw <| .TransactionException .INSUFFICIENT_MAX_FEE_PER_GAS
 
-  let g₀ : ℕ := intrinsicGas T
-  if T.base.gasLimit.toNat < g₀ then
+  let intrinsic := intrinsicGas T
+  if T.base.gasLimit.toNat < intrinsic then
     throw <| .TransactionException .INTRINSIC_GAS_TOO_LOW
   match T with
     | .dynamic t =>
@@ -247,7 +223,7 @@ def validateTransaction
   let s : ℕ := fromByteArrayBigEndian T.base.s
   if 0 ≥ r ∨ r ≥ secp256k1n then throw <| .TransactionException .INVALID_SIGNATURE_VRS
   if 0 ≥ s ∨ s > secp256k1n / 2 then throw <| .TransactionException .INVALID_SIGNATURE_VRS
-  let v : ℕ := -- (324)
+  let v : ℕ :=
     match T with
       | .legacy t =>
         let w := t.w.toNat
@@ -261,24 +237,23 @@ def validateTransaction
       | .access t | .dynamic t | .blob t => t.yParity.toNat
   if v ∉ [0, 1] then throw <| .TransactionException .INVALID_SIGNATURE_VRS
 
-  let h_T := -- (318)
+  let txHash :=
     match T with
       | .legacy _ => ffi.KEC T_RLP
       | _ => ffi.KEC <| ByteArray.mk #[T.type] ++ T_RLP
 
-  let (sender : AccountAddress) ← -- (323)
+  let (sender : AccountAddress) ←
     -- Fixture-provided sender (when present) replaces the evmrs-backed ECDSA
     -- recovery; the v/r/s validity checks above still run either way.
     match senderHint with
       | some sender => pure sender
       | none =>
-        match ECDSARECOVER h_T (ByteArray.mk #[.ofNat v]) T.base.r T.base.s with
+        match ECDSARECOVER txHash (ByteArray.mk #[.ofNat v]) T.base.r T.base.s with
           | .ok s =>
             pure <| Fin.ofNat _ <| fromByteArrayBigEndian <|
               (ffi.KEC s).extract 12 32 /- 160 bits = 20 bytes -/
           | .error s => throw <| .SenderRecoverError s
 
-  -- "Also, with a slight abuse of notation ... "
   let (senderCode, senderNonce, senderBalance) :=
     match accounts.find? sender with
       | some sender => (sender.code, sender.nonce, sender.balance)
@@ -289,7 +264,7 @@ def validateTransaction
     throw <| .TransactionException .NONCE_MISMATCH_TOO_LOW
   if T.base.nonce > senderNonce then
     throw <| .TransactionException .NONCE_MISMATCH_TOO_HIGH
-  let v₀ ← do
+  let upfrontCost ← do
     match T with
       | .legacy t | .access t =>
         if t.gasLimit.toNat * t.gasPrice.toNat > 2^256 then
@@ -301,39 +276,37 @@ def validateTransaction
           UInt256.ofUInt64 t.gasLimit * t.maxFeePerGas
           + t.value
           + (UInt256.ofNat (getTotalBlobGas T)) * t.maxFeePerBlobGas
-  if v₀ > senderBalance then
+  if upfrontCost > senderBalance then
     throw <| .TransactionException .INSUFFICIENT_ACCOUNT_FUNDS
 
   pure sender
 
  where
-  txSigningData (T : Transaction) : Except Evm.Exception Rlp := -- (317)
+  txSigningData (T : Transaction) : Except Evm.Exception Rlp :=
     let accessEntryRLP : AccountAddress × Array UInt256 → Rlp
       | ⟨a, s⟩ => .list [.bytes a.toByteArray, .list (s.map (.bytes ∘ UInt256.toByteArray)).toList]
     let accessEntriesRLP (aEs : List (AccountAddress × Array UInt256)) : Rlp :=
       .list (aEs.map accessEntryRLP)
     match T with
-      | /- 0 -/ .legacy t =>
+      | .legacy t =>
         if t.w.toNat ∈ [27, 28] then
           .ok ∘ .list ∘ List.map .bytes <|
-            [ BE t.nonce.toNat -- Tₙ
-            , BE t.gasPrice.toNat -- Tₚ
-            , BE t.gasLimit.toNat -- T_g
-            , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-              t.recipient.option .empty AccountAddress.toByteArray -- Tₜ
-            , BE t.value.toNat -- Tᵥ
+            [ BE t.nonce.toNat
+            , BE t.gasPrice.toNat
+            , BE t.gasLimit.toNat
+            , t.recipient.option .empty AccountAddress.toByteArray
+            , BE t.value.toNat
             , t.data
             ]
         else
           if t.w = .ofNat (35 + chainId * 2) ∨ t.w = .ofNat (36 + chainId * 2) then
             .ok ∘ .list ∘ List.map .bytes <|
-              [ BE t.nonce.toNat -- Tₙ
-              , BE t.gasPrice.toNat -- Tₚ
-              , BE t.gasLimit.toNat -- T_g
-              , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-                t.recipient.option .empty AccountAddress.toByteArray -- Tₜ
-              , BE t.value.toNat -- Tᵥ
-              , t.data -- p
+              [ BE t.nonce.toNat
+              , BE t.gasPrice.toNat
+              , BE t.gasLimit.toNat
+              , t.recipient.option .empty AccountAddress.toByteArray
+              , BE t.value.toNat
+              , t.data
               , BE chainId
               , .empty
               , .empty
@@ -342,43 +315,40 @@ def validateTransaction
             dbg_trace "IllFormedRLP legacy transacion: Tw = {t.w}; chainId = {chainId}"
             throw <| .TransactionException .IllFormedRLP
 
-      | /- 1 -/ .access t =>
+      | .access t =>
         .ok ∘ .list <|
-          [ .bytes (BE t.chainId.toNat) -- T_c
-          , .bytes (BE t.nonce.toNat) -- Tₙ
-          , .bytes (BE t.gasPrice.toNat) -- Tₚ
-          , .bytes (BE t.gasLimit.toNat) -- T_g
-          , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .bytes (BE t.value.toNat) -- T_v
-          , .bytes t.data  -- p
-          , accessEntriesRLP t.accessList -- T_A
+          [ .bytes (BE t.chainId.toNat)
+          , .bytes (BE t.nonce.toNat)
+          , .bytes (BE t.gasPrice.toNat)
+          , .bytes (BE t.gasLimit.toNat)
+          , .bytes (t.recipient.option .empty AccountAddress.toByteArray)
+          , .bytes (BE t.value.toNat)
+          , .bytes t.data
+          , accessEntriesRLP t.accessList
           ]
-      | /- 2 -/ .dynamic t =>
+      | .dynamic t =>
         .ok ∘ .list <|
-          [ .bytes (BE t.chainId.toNat) -- T_c
-          , .bytes (BE t.nonce.toNat) -- Tₙ
-          , .bytes (BE t.maxPriorityFeePerGas.toNat) -- T_f
-          , .bytes (BE t.maxFeePerGas.toNat) -- Tₘ
-          , .bytes (BE t.gasLimit.toNat) -- T_g
-          , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .bytes (BE t.value.toNat) -- Tᵥ
-          , .bytes t.data -- p
-          , accessEntriesRLP t.accessList -- T_A
+          [ .bytes (BE t.chainId.toNat)
+          , .bytes (BE t.nonce.toNat)
+          , .bytes (BE t.maxPriorityFeePerGas.toNat)
+          , .bytes (BE t.maxFeePerGas.toNat)
+          , .bytes (BE t.gasLimit.toNat)
+          , .bytes (t.recipient.option .empty AccountAddress.toByteArray)
+          , .bytes (BE t.value.toNat)
+          , .bytes t.data
+          , accessEntriesRLP t.accessList
           ]
-      | /- 3 -/ .blob t =>
+      | .blob t =>
         .ok ∘ .list <|
-          [ .bytes (BE t.chainId.toNat) -- T_c
-          , .bytes (BE t.nonce.toNat) -- Tₙ
-          , .bytes (BE t.maxPriorityFeePerGas.toNat) -- T_f
-          , .bytes (BE t.maxFeePerGas.toNat) -- Tₘ
-          , .bytes (BE t.gasLimit.toNat) -- T_g
-          , -- If Tₜ is ∅ it becomes the RLP empty byte sequence and thus the member of 𝔹₀
-            .bytes (t.recipient.option .empty AccountAddress.toByteArray) -- Tₜ
-          , .bytes (BE t.value.toNat) -- Tᵥ
-          , .bytes t.data -- p
-          , accessEntriesRLP t.accessList -- T_A
+          [ .bytes (BE t.chainId.toNat)
+          , .bytes (BE t.nonce.toNat)
+          , .bytes (BE t.maxPriorityFeePerGas.toNat)
+          , .bytes (BE t.maxFeePerGas.toNat)
+          , .bytes (BE t.gasLimit.toNat)
+          , .bytes (t.recipient.option .empty AccountAddress.toByteArray)
+          , .bytes (BE t.value.toNat)
+          , .bytes t.data
+          , accessEntriesRLP t.accessList
           , .bytes (BE t.maxFeePerBlobGas.toNat)
           , .list (t.blobVersionedHashes.map .bytes)
           ]
@@ -421,11 +391,8 @@ def validateBlock
 
   if blobGasUsed > MAX_BLOB_GAS_PER_BLOCK then
     throw <| .BlockException .BLOB_GAS_USED_ABOVE_LIMIT
-
-  -- The trie-root checks below shell out to evmrs per call (state root: one
-  -- process). They can only *detect* a divergence that the final
-  -- postState comparison detects anyway, so we run them solely for blocks that
-  -- expect a block exception — where the specific exception is the oracle.
+  -- Full root checks are expensive, so only run them when an expected block
+  -- exception needs the specific exception as an oracle.
   let runExpensiveRootChecks := ¬block.exception.isEmpty
 
   if runExpensiveRootChecks then
@@ -463,9 +430,6 @@ def deserializeRawBlock (rawBlock : RawBlock)
     deserializeBlock rawBlock.rlp (computeRoots := ¬rawBlock.exception.isEmpty)
   pure <| .mk blockHash blockHeader transactions withdrawals rawBlock.exception rawBlock.senders
 
-/--
-This assumes that the `transactions` are ordered, as they should be in the test suit.
--/
 def processBlocks
   (pre : Pre)
   (blocks : RawBlocks)
@@ -473,7 +437,7 @@ def processBlocks
   : Except Evm.Exception ExecutionState
 := do
   let (genesisHash, genesisBlockHeader, _) ← deserializeBlock genesisRLP (computeRoots := false)
-  let state₀ :=
+  let state0 :=
     { pre.toEVMState with
         genesisBlockHeader := genesisBlockHeader
         blocks :=
@@ -485,7 +449,7 @@ def processBlocks
           ]
     }
   let state ←
-    blocks.foldlM (init := state₀)
+    blocks.foldlM (init := state0)
       λ accState rawBlock ↦ do
         try
           let block ← deserializeRawBlock rawBlock
@@ -506,37 +470,33 @@ def processBlocks
             | .MissedExpectedException _  => throw e
             | _ =>
               if rawBlock.exception.contains (repr e).pretty then
-                -- dbg_trace
-                --   s!"Expected exception: {String.intercalate "|" rawBlock.exception}; got exception: {repr e}"
                 pure accState
               else
                 throw e
   pure state
  where
   processBlock
-    (s₀ : ExecutionState)
+    (initialState : ExecutionState)
     (block : DeserializedBlock)
     : Except Evm.Exception ExecutionState
   := do
-    -- Beacon call
     let s ← do
       let BEACON_ROOTS_ADDRESS : AccountAddress :=
         0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02
       let SYSTEM_ADDRESS : AccountAddress :=
         0xfffffffffffffffffffffffffffffffffffffffe
-      match s₀.accounts.find? BEACON_ROOTS_ADDRESS with
-        | none => pure s₀
+      match initialState.accounts.find? BEACON_ROOTS_ADDRESS with
+        | none => pure initialState
         | some roots =>
           let beaconRootsAddressCode := roots.code
-          -- the call does not count against the block’s gas limit
           let beaconCallResult :=
             messageCall
               { blobVersionedHashes := []
                 createdAccounts := .empty
-                genesisBlockHeader := s₀.genesisBlockHeader
-                blocks := s₀.blocks
-                accounts := s₀.accounts
-                originalAccounts := s₀.accounts
+                genesisBlockHeader := initialState.genesisBlockHeader
+                blocks := initialState.blocks
+                accounts := initialState.accounts
+                originalAccounts := initialState.accounts
                 substate := default
                 caller := SYSTEM_ADDRESS
                 origin := SYSTEM_ADDRESS
@@ -553,12 +513,10 @@ def processBlocks
                 canModifyState := true }
           let accounts ←
             match beaconCallResult with
-              | .ok r /- can't fail -/ => pure r.accounts
+              | .ok r => pure r.accounts
               | .error e => throw <| .ExecutionException e
-          let s := {s₀ with accounts := accounts}
+          let s := {initialState with accounts := accounts}
           pure s
-
-    -- Transactions execution
     let s ←
       block.transactions.array.zipIdx.foldlM
         (λ s' (tx, i) ↦ do
@@ -574,17 +532,10 @@ def processBlocks
         )
         {s with totalGasUsedInBlock := 0, transactionReceipts := .empty}
 
-    -- Withdrawals execution
     let accounts := applyWithdrawals s.accounts block.withdrawals.array
 
     pure { s with accounts := accounts }
 
-/--
-- `.none` on success
-- `.some endState` on failure
-
-NB we can throw away the final state if it coincided with the expected one, hence `.none`.
--/
 def preImpliesPost (entry : TestEntry)
   : Except Evm.Exception (Option (PersistentAccountMap))
 := do
@@ -601,7 +552,7 @@ def preImpliesPost (entry : TestEntry)
         match almostBEqButNotQuite post result with
           | .error e =>
             dbg_trace e
-            pure (.some persistentAccountMap) -- Feel free to inspect this error from `almostBEqButNotQuite`.
+            pure (.some persistentAccountMap)
           | .ok _ => pure .none
       | .Hash h =>
         if stateTrieRoot persistentAccountMap ≠ h then
@@ -636,7 +587,7 @@ def processTest (entry : TestEntry) (isTimed : Option (Nat × TestId) := .none) 
         verboseError : PersistentAccountMap → String := λ accounts ↦
           match entry.postState with
             | .Map post =>
-              let (postSubActual, actualSubPost) := storageΔ post accounts
+              let (postSubActual, actualSubPost) := storageDelta post accounts
               s!"\npost / actual: {repr postSubActual} \nactual / post: {repr actualSubPost}"
             | .Hash h =>
               s!"\npost: {toHex h} \nactual: {toHex <$> stateTrieRoot accounts}"

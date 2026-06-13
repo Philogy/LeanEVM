@@ -10,7 +10,6 @@ import Evm.Crypto.Keccak256
 
 namespace Evm
 
-/-- The address-derivation preimage `L_A` (eq. 96). -/
 private def contractAddressBytes (creator : AccountAddress) (creatorNonce : UInt256) (salt : Option ByteArray) (initCode : ByteArray) :
   Option ByteArray
 :=
@@ -21,10 +20,9 @@ private def contractAddressBytes (creator : AccountAddress) (creatorNonce : UInt
     | some salt => .some <| BE 255 ++ creator ++ salt ++ ffi.KEC initCode
 
 /--
-Enter a contract creation — the YP's `Λ` (eq. 93) up to the recursive code
-execution: address derivation (eq. 94–96), the EIP-7610 occupied-address
-check, account initialisation (eq. 97–99), and execution-environment
-construction.
+Enter a contract creation up to recursive code execution: derive the address,
+apply occupied-address checks, initialise the account, and construct the child
+environment.
 -/
 def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
   let accounts := params.accounts
@@ -36,13 +34,11 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
   let creatorNonce : UInt64 := (accounts.find? creator |>.option 0 (·.nonce)) - 1
   let creatorNonceWord : UInt256 := UInt256.ofUInt64 creatorNonce
   let some addressPreimage := contractAddressBytes creator creatorNonceWord params.salt params.initCode | .error .StackUnderflow
-  let newAddress : AccountAddress := -- (94) (95)
+  let newAddress : AccountAddress :=
     (ffi.KEC addressPreimage).extract 12 32 /- 160 bits = 20 bytes -/
       |> fromByteArrayBigEndian |> Fin.ofNat _
 
-  -- A* (97)
   let substateWithNew := params.substate.addAccessedAccount newAddress
-  -- σ* (99)
   let existentAccount := accounts.findD newAddress default
 
   /-
@@ -68,13 +64,12 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
         balance := params.value + existentAccount.balance
     }
 
-  -- If `value` ≠ 0 then the sender must have passed the `INSUFFICIENT_ACCOUNT_FUNDS` check
   let accountsWithNew :=
     match accounts.find? creator with
       | none => accounts
       | some ac =>
         accounts.insert creator { ac with balance := ac.balance - params.value }
-          |>.insert newAddress newAccount -- (99)
+          |>.insert newAddress newAccount
   let env : ExecutionEnv :=
     { address := newAddress
     , origin    := params.origin
@@ -104,17 +99,14 @@ def beginCreate (params : CreateParams) : Except ExecutionException Frame := do
             genesisBlockHeader := params.genesisBlockHeader } }
 
 /--
-Finish a contract creation — the YP's `Λ` after init-code execution: charge
-the code-deposit cost (eq. 113–114), run the failure checks `F` (eq. 118 —
-occupied address, unaffordable deposit, EIP-170 size, EIP-3541 `0xef`), and
-either store the code or roll back to the checkpoint (eq. 115–117).
+Finish a contract creation after init-code execution: charge code deposit,
+check deployment failure conditions, and either store the code or roll back.
 -/
 def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt → CreateResult
   | .success exec returnedData =>
-    -- The code-deposit cost (113)
     let depositCost := GasConstants.Gcodedeposit * returnedData.size
 
-    let deploymentFailed : Bool := Id.run do -- (118)
+    let deploymentFailed : Bool := Id.run do
       let addressOccupied : Bool :=
         match checkpoint.accounts.find? address with
         | .some ac => ac.code ≠ .empty ∨ ac.nonce ≠ 0
@@ -125,7 +117,7 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
       let startsWith0xef : Bool := ¬codeTooLong && returnedData[0]? = some 0xef
       pure (addressOccupied ∨ cannotAffordDeposit ∨ codeTooLong ∨ startsWith0xef)
 
-    let accounts' : AccountMap := -- (115)
+    let accounts' : AccountMap :=
       if deploymentFailed then checkpoint.accounts else
         let newAccount' := exec.accounts.findD address default
         exec.accounts.insert address { newAccount' with code := returnedData }
@@ -133,10 +125,10 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
     { address := address
       createdAccounts := exec.createdAccounts
       accounts := accounts'
-      gasRemaining := .ofNat <| if deploymentFailed then 0 else exec.gasAvailable.toNat - depositCost -- (114)
-      substate := if deploymentFailed then checkpoint.substate else exec.substate -- (116)
-      success := !deploymentFailed -- (117)
-      output := .empty } -- (93)
+      gasRemaining := .ofNat <| if deploymentFailed then 0 else exec.gasAvailable.toNat - depositCost
+      substate := if deploymentFailed then checkpoint.substate else exec.substate
+      success := !deploymentFailed
+      output := .empty }
   | .revert gasRemaining output =>
     { address := address
       createdAccounts := checkpoint.createdAccounts
@@ -155,9 +147,8 @@ def endCreate (address : AccountAddress) (checkpoint : Checkpoint) : FrameHalt �
       output := .empty }
 
 /--
-Resume a frame suspended on CREATE/CREATE2: restore the unused gas (the
-parent retained `g − L(g)`), set the return data on failure, push the new
-contract's address (or 0), and advance the pc.
+Resume a frame suspended on CREATE/CREATE2: restore unused gas, set the return
+data on failure, push the new contract address (or 0), and advance the pc.
 -/
 def resumeAfterCreate (result : CreateResult) (pd : PendingCreate) :
     Except ExecutionException Frame := do

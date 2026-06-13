@@ -26,9 +26,6 @@ def updateTransientStorage (self : Account) (k v : UInt256) : Account :=
   else
     { self with tstorage := self.tstorage.insert k v }
 
-/--
-EMPTY(accounts, a). Section 4.1., equation 14.
--/
 def emptyAccount (self : Account) : Bool :=
   self.code.isEmpty ∧ self.nonce = 0 ∧ self.balance = 0
 

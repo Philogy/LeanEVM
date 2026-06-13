@@ -3,8 +3,6 @@ import Evm.Wheels
 import Evm.Maps.AccountMap
 namespace Evm
 
-
-
 inductive ExecutionException where
   | OutOfFuel
   | InvalidInstruction
